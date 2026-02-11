@@ -1,0 +1,22 @@
+{
+  "name": "verdemex-ticketsbd",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "inquirer": "^13.2.2",
+    "multer": "^2.0.2"
+  }
+}
