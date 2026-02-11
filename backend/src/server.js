@@ -6,25 +6,37 @@ const multer = require("multer");
 const archiver = require("archiver");
 
 const { generateExcel } = require("./excelGenerator");
-// OJO: ya NO vamos a depender de loadConfig para generar excel,
-// pero dejamos configStore para que /api/config siga existiendo.
 const { loadConfig, saveConfig } = require("./configStore");
-
 const { excelToTxtBuffer, excelToTicketFiles } = require("./excelToTxt");
 
 const app = express();
 
 // -------------------------
-// CORS (para Vercel/Render)
+// CORS (Vercel -> Render)
 // -------------------------
-// En local puedes dejar "*".
-// En producción: CORS_ORIGIN="https://tu-app.vercel.app"
-const allowed = process.env.CORS_ORIGIN || "*";
+// Render env var example:
+// CORS_ORIGIN="https://verdemex-ticketsbd.vercel.app,https://verdemex-ticketsbd-xxxxx.vercel.app"
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: allowed === "*" ? "*" : allowed.split(","),
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true); // curl/postman ok
+      if (allowedOrigins.length === 0) return cb(null, true); // si no configuras, no bloquea
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("CORS blocked: " + origin));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// ✅ IMPORTANTE: evita app.options("*"...)
+// En algunos routers/path-to-regexp rompe con "*"
+app.options(/.*/, cors());
 
 app.use(express.json());
 
@@ -41,8 +53,6 @@ function safeLoadConfig() {
   try {
     return loadConfig();
   } catch (e) {
-    // Si no existe config.json o truena, regresamos un objeto mínimo
-    // para no romper el backend.
     return {
       company: {
         reportTitle: "REPORTE MENSUAL",
@@ -63,21 +73,18 @@ function safeLoadConfig() {
 // CONFIG (opcional)
 // -------------------------
 app.get("/api/config", (req, res) => {
-  const cfg = safeLoadConfig();
-  res.json(cfg);
+  res.json(safeLoadConfig());
 });
 
 app.post("/api/config", (req, res) => {
-  // Guardar como antes (si no existe carpeta/archivo, tu configStore debe crearla)
   saveConfig(req.body);
   res.json({ ok: true });
 });
 
 // -------------------------
-// GENERAR EXCEL
+// GENERAR EXCEL (ÚNICA RUTA)
 // -------------------------
-// ✅ Ruta que usa tu FRONT actual: api.post("/generate-excel", payload)
-app.post("/generate-excel", async (req, res) => {
+app.post("/api/generate-excel", async (req, res) => {
   try {
     const { startDate, endDate, ticketInicial, config } = req.body;
 
@@ -92,40 +99,8 @@ app.post("/generate-excel", async (req, res) => {
     }
 
     const fileName = `reporte_${Date.now()}.xlsx`;
-
     const filePath = await generateExcel({
       config,
-      startDateISO: startDate,
-      endDateISO: endDate,
-      ticketInicial: Number(ticketInicial),
-      outputName: fileName,
-    });
-
-    return res.download(filePath);
-  } catch (err) {
-    console.error(err);
-    return res.status(400).json({ error: err.message || "Error generando excel" });
-  }
-});
-
-// ✅ Alias: si alguna parte vieja todavía llama /api/generate-excel
-app.post("/api/generate-excel", async (req, res) => {
-  try {
-    // Opción B: intentamos usar config del body si existe; si no, usamos safeLoadConfig
-    const { startDate, endDate, ticketInicial, config } = req.body;
-
-    if (!startDate || !endDate) {
-      return res.status(400).json({ error: "Falta startDate o endDate" });
-    }
-    if (ticketInicial === undefined || ticketInicial === null || ticketInicial === "") {
-      return res.status(400).json({ error: "Falta ticketInicial" });
-    }
-
-    const finalConfig = config && typeof config === "object" ? config : safeLoadConfig();
-
-    const fileName = `reporte_${Date.now()}.xlsx`;
-    const filePath = await generateExcel({
-      config: finalConfig,
       startDateISO: startDate,
       endDateISO: endDate,
       ticketInicial: Number(ticketInicial),

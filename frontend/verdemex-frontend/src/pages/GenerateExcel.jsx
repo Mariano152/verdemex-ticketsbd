@@ -19,14 +19,11 @@ export default function GenerateExcel() {
   }, []);
 
   const generate = async () => {
-    if (!import.meta.env.VITE_API_URL) {
-      return alert("Falta VITE_API_URL. Revisa tu .env o variables de Vercel.");
-    }
-
     if (!startDate || !endDate) return alert("Falta fecha inicio/fin");
     if (!ticketInicial) return alert("Falta ticket inicial");
-    if (!config.drivers || config.drivers.length === 0)
+    if (!config.drivers || config.drivers.length === 0) {
       return alert("No hay conductores. Ve a Conductores y agrega.");
+    }
 
     setLoading(true);
     try {
@@ -40,7 +37,8 @@ export default function GenerateExcel() {
         },
       };
 
-      const res = await api.post("/generate-excel", payload, { responseType: "blob" });
+      // ✅ Ruta ÚNICA del backend
+      const res = await api.post("/api/generate-excel", payload, { responseType: "blob" });
 
       const url = window.URL.createObjectURL(res.data);
       const a = document.createElement("a");
@@ -50,7 +48,7 @@ export default function GenerateExcel() {
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
-      alert("Error generando excel. Revisa consola y que el backend esté corriendo.");
+      alert("Error generando excel. Revisa consola y logs de Render.");
     } finally {
       setLoading(false);
     }

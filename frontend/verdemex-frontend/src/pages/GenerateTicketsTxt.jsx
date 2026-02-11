@@ -1,12 +1,12 @@
 import { useState } from "react";
+import { api } from "../api";
 
 export default function GenerateTicketsTxt() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [zipMode, setZipMode] = useState(false);
 
-  const downloadBlob = async (res, filename) => {
-    const blob = await res.blob();
+  const downloadBlob = (blob, filename) => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -20,29 +20,23 @@ export default function GenerateTicketsTxt() {
   const submit = async () => {
     if (!file) return alert("Sube un Excel primero.");
 
-    const base = import.meta.env.VITE_API_URL;
-    if (!base) return alert("Falta VITE_API_URL. Revisa tu .env o variables de Vercel.");
-
     setLoading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
 
-      const endpoint = zipMode
-        ? `${base}/api/excel-to-txt-zip`
-        : `${base}/api/excel-to-txt`;
+      const endpoint = zipMode ? "/api/excel-to-txt-zip" : "/api/excel-to-txt";
 
-      const res = await fetch(endpoint, { method: "POST", body: fd });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Error generando archivo");
-      }
+      const res = await api.post(endpoint, fd, {
+        responseType: "blob",
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       const ext = zipMode ? "zip" : "txt";
-      await downloadBlob(res, `tickets_${Date.now()}.${ext}`);
+      downloadBlob(res.data, `tickets_${Date.now()}.${ext}`);
     } catch (e) {
-      alert(e.message);
+      console.error(e);
+      alert("Error generando archivo. Revisa consola y logs de Render.");
     } finally {
       setLoading(false);
     }
@@ -72,15 +66,7 @@ export default function GenerateTicketsTxt() {
         </div>
       )}
 
-      <div
-        style={{
-          marginTop: 12,
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
+      <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <label className="badge" style={{ cursor: "pointer" }}>
           <input
             type="checkbox"
