@@ -8,6 +8,8 @@ const archiver = require("archiver");
 const { generateExcel } = require("./excelGenerator");
 const { loadConfig, saveConfig } = require("./configStore");
 const { excelToTxtBuffer, excelToTicketFiles } = require("./excelToTxt");
+const { formatDateForFilename } = require("./utils");
+const { saveFile, getFiles } = require("./database");
 
 const app = express();
 
@@ -55,7 +57,7 @@ function safeLoadConfig() {
   } catch (e) {
     return {
       company: {
-        reportTitle: "REPORTE MENSUAL",
+        reportTitle: "CONTROL DE RESIDUOS",
         basculaCertificada: "",
         precioPorTon: 0,
       },
@@ -86,28 +88,47 @@ app.post("/api/config", (req, res) => {
 // -------------------------
 app.post("/api/generate-excel", async (req, res) => {
   try {
-    const { startDate, endDate, ticketInicial, config } = req.body;
+    const { startDate, endDate, lastTicketNumber, lastTicketDate, spacingVariance, spacingVarianceRange, dailyTicketCount, dailyTicketCountRange, config } = req.body;
 
     if (!startDate || !endDate) {
       return res.status(400).json({ error: "Falta startDate o endDate" });
     }
-    if (ticketInicial === undefined || ticketInicial === null || ticketInicial === "") {
-      return res.status(400).json({ error: "Falta ticketInicial" });
+    if (lastTicketNumber === undefined || lastTicketNumber === null || lastTicketNumber === "") {
+      return res.status(400).json({ error: "Falta lastTicketNumber" });
+    }
+    if (!lastTicketDate) {
+      return res.status(400).json({ error: "Falta lastTicketDate" });
+    }
+    if (!spacingVariance) {
+      return res.status(400).json({ error: "Falta spacingVariance" });
+    }
+    if (!dailyTicketCount) {
+      return res.status(400).json({ error: "Falta dailyTicketCount" });
     }
     if (!config || typeof config !== "object") {
       return res.status(400).json({ error: "Falta config en el body" });
     }
 
-    const fileName = `reporte_${Date.now()}.xlsx`;
+    const startDateFormatted = formatDateForFilename(new Date(startDate));
+    const endDateFormatted = formatDateForFilename(new Date(endDate));
+    const fileName = `reporte_${startDateFormatted}-${endDateFormatted}.xlsx`;
     const filePath = await generateExcel({
       config,
       startDateISO: startDate,
       endDateISO: endDate,
-      ticketInicial: Number(ticketInicial),
+      lastTicketNumber: Number(lastTicketNumber),
+      lastTicketDate,
+      spacingVariance: Number(spacingVariance),
+      spacingVarianceRange: Number(spacingVarianceRange),
+      dailyTicketCount: Number(dailyTicketCount),
+      dailyTicketCountRange: Number(dailyTicketCountRange),
       outputName: fileName,
     });
 
-    return res.download(filePath);
+    // Guardar en base de datos
+    await saveFile(fileName, 'excel', filePath);
+
+    return res.download(filePath, fileName);
   } catch (err) {
     console.error(err);
     return res.status(400).json({ error: err.message || "Error generando excel" });
@@ -117,15 +138,26 @@ app.post("/api/generate-excel", async (req, res) => {
 // -------------------------
 // EXCEL -> TXT ÚNICO
 // -------------------------
+// Helper para convertir nombre de Excel a TXT/ZIP
+function getOutputFilename(excelFilename, extension) {
+  // Remover extensión .xlsx
+  const baseName = excelFilename.replace(/\.xlsx$/i, '');
+  // Reemplazar "reporte_" por "tickets_"
+  const ticketName = baseName.replace(/^reporte_/, 'tickets_');
+  return `${ticketName}.${extension}`;
+}
 app.post("/api/excel-to-txt", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
     const buf = await excelToTxtBuffer(req.file.buffer);
 
-    const outName = `tickets_${Date.now()}.txt`;
+    const outName = getOutputFilename(req.file.originalname, 'txt');
     const outPath = path.join(outDir, outName);
     fs.writeFileSync(outPath, buf);
+
+    // Guardar en base de datos
+    await saveFile(outName, 'txt', outPath);
 
     return res.download(outPath, outName);
   } catch (err) {
@@ -143,24 +175,56 @@ app.post("/api/excel-to-txt-zip", upload.single("file"), async (req, res) => {
 
     const files = await excelToTicketFiles(req.file.buffer);
 
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="tickets_${Date.now()}.zip"`);
+    const zipName = getOutputFilename(req.file.originalname, 'zip');
+    const zipPath = path.join(outDir, zipName);
 
+    // Crear el archivo ZIP en el sistema de archivos
+    const output = fs.createWriteStream(zipPath);
     const archive = archiver("zip", { zlib: { level: 9 } });
+
     archive.on("error", (err) => {
       throw err;
     });
 
-    archive.pipe(res);
+    archive.pipe(output);
 
     for (const f of files) {
       archive.append(f.content, { name: f.name });
     }
 
     await archive.finalize();
+
+    // Esperar a que se termine de escribir
+    await new Promise((resolve, reject) => {
+      output.on('close', resolve);
+      output.on('error', reject);
+    });
+
+    // Guardar en base de datos
+    await saveFile(zipName, 'zip', zipPath);
+
+    // Enviar el archivo
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+    const zipStream = fs.createReadStream(zipPath);
+    zipStream.pipe(res);
+
   } catch (err) {
     console.error(err);
     return res.status(400).json({ error: err.message || "Error generando ZIP" });
+  }
+});
+
+// -------------------------
+// OBTENER LISTA DE ARCHIVOS
+// -------------------------
+app.get("/api/files", async (req, res) => {
+  try {
+    const files = await getFiles();
+    return res.json({ files });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Error obteniendo archivos" });
   }
 });
 

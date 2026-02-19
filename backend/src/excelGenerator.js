@@ -2,7 +2,8 @@
 
 const path = require("path");
 const ExcelJS = require("exceljs");
-const { buildDateList, formatDateDMY, randomPesoTon, tonToKg, roundTo } = require("./utils");
+const { buildDateList, formatDateDMY, formatDateForFilename, randomPesoTon, tonToKg, roundTo, calculateInitialTicket, randomSpacing, randomDailyTickets } = require("./utils");
+const { differenceInDays } = require("date-fns");
 
 /**
  * Genera filas de tickets según:
@@ -10,19 +11,25 @@ const { buildDateList, formatDateDMY, randomPesoTon, tonToKg, roundTo } = requir
  * - conductores activos
  * - ticketsPorDia por conductor
  * - horarios rotativos (si ticketsPorDia > horarios.length, repite)
- * - tickets consecutivos desde ticketInicial
+ * - tickets con espaciado inteligente basado en brecha de tiempo
  *
  * CAMBIOS CLAVE:
  * - TODO a 2 decimales en peso/tara/kg
  * - KG NETO = TON*1000 (2 dec)
  * - KG BRUTO = KG NETO + TARA (2 dec)
  * - Formatos numéricos Excel (0.00) para columnas 7 a 10
+ * - Nuevo sistema de numeración de tickets basado en espaciado
  */
 async function generateExcel({
   config,
   startDateISO,
   endDateISO,
-  ticketInicial,
+  lastTicketNumber,
+  lastTicketDate,
+  spacingVariance,
+  spacingVarianceRange,
+  dailyTicketCount,
+  dailyTicketCountRange,
   outputName
 }) {
   const { company, rules } = config;
@@ -35,11 +42,22 @@ async function generateExcel({
   const skipSundays = Boolean(config?.rules?.skipSundays ?? true);
   const dates = buildDateList(startDateISO, endDateISO, skipSundays);
 
+  // Calcular el ticket inicial considerando la brecha
+  let ticket = calculateInitialTicket(
+    Number(lastTicketNumber),
+    lastTicketDate,
+    startDateISO,
+    Number(spacingVariance),
+    Number(dailyTicketCount),
+    skipSundays
+  );
+
   const workbook = new ExcelJS.Workbook();
   const ws = workbook.addWorksheet("Reporte");
 
   // ✅ Título (12 columnas -> A:L)
-  const titleText = `${company.reportTitle} (${formatDateDMY(new Date(startDateISO))} - ${formatDateDMY(new Date(endDateISO))})`;
+  // usar T00:00:00 para evitar desplazamiento por zona horaria
+  const titleText = `CONTROL DE RESIDUOS (${formatDateForFilename(new Date(startDateISO + "T00:00:00"))} - ${formatDateForFilename(new Date(endDateISO + "T00:00:00"))})`;
   ws.mergeCells("A1:L1");
   ws.getCell("A1").value = titleText;
   ws.getCell("A1").font = { size: 16, bold: true };
@@ -84,13 +102,17 @@ async function generateExcel({
     { width: 14 }
   ];
 
-  let ticket = Number(ticketInicial);
-
   // ✅ FORZAMOS 2 DECIMALES en TON y KG
   const decimalsTon = 2;
   const decimalsKg = 2;
 
   for (const dateObj of dates) {
+    // Agregar media día al cambiar de día (excepto el primero)
+    if (dateObj > new Date(startDateISO + "T00:00:00")) {
+      const dailyTickets = randomDailyTickets(Number(dailyTicketCount), Number(dailyTicketCountRange));
+      ticket += dailyTickets / 2;
+    }
+
     for (const d of drivers) {
       const perDay = Number(d.ticketsPorDia) || 0;
       if (perDay <= 0) continue;
@@ -99,6 +121,10 @@ async function generateExcel({
         const horario = (d.horarios && d.horarios.length)
           ? d.horarios[i % d.horarios.length]
           : "";
+
+        // ✅ Agregar espaciado aleatorio al ticket actual
+        const spacing = randomSpacing(Number(spacingVariance), Number(spacingVarianceRange));
+        ticket += spacing;
 
         // ✅ TON con 2 decimales
         const pesoTon = randomPesoTon(
@@ -126,7 +152,7 @@ async function generateExcel({
           d.nombre,
           d.placas,
           horario,
-          ticket,
+          Math.floor(ticket), // Convertir a entero
           company.basculaCertificada,
           pesoTon,
           taraKg,
@@ -135,8 +161,6 @@ async function generateExcel({
           precioTon,
           total
         ]);
-
-        ticket++;
       }
     }
   }

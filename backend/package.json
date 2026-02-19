@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +17,7 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "inquirer": "^13.2.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "pg": "^8.18.0"
   }
 }

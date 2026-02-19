@@ -6,7 +6,12 @@ export default function GenerateExcel() {
   const [config, setConfig] = useState(getDefaultConfig());
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [ticketInicial, setTicketInicial] = useState("");
+  const [lastTicketNumber, setLastTicketNumber] = useState("");
+  const [lastTicketDate, setLastTicketDate] = useState("");
+  const [spacingVariance, setSpacingVariance] = useState(8);
+  const [spacingVarianceRange, setSpacingVarianceRange] = useState(2);
+  const [dailyTicketCount, setDailyTicketCount] = useState(80);
+  const [dailyTicketCountRange, setDailyTicketCountRange] = useState(10);
   const [precioPorTon, setPrecioPorTon] = useState(520.33);
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +25,10 @@ export default function GenerateExcel() {
 
   const generate = async () => {
     if (!startDate || !endDate) return alert("Falta fecha inicio/fin");
-    if (!ticketInicial) return alert("Falta ticket inicial");
+    if (!lastTicketNumber) return alert("Falta último ticket registrado");
+    if (!lastTicketDate) return alert("Falta fecha del último ticket");
+    if (!spacingVariance) return alert("Falta espaciado entre tickets");
+    if (!dailyTicketCount) return alert("Falta cantidad de tickets por día");
     if (!config.drivers || config.drivers.length === 0) {
       return alert("No hay conductores. Ve a Conductores y agrega.");
     }
@@ -30,7 +38,12 @@ export default function GenerateExcel() {
       const payload = {
         startDate,
         endDate,
-        ticketInicial: Number(ticketInicial),
+        lastTicketNumber: Number(lastTicketNumber),
+        lastTicketDate,
+        spacingVariance: Number(spacingVariance),
+        spacingVarianceRange: Number(spacingVarianceRange),
+        dailyTicketCount: Number(dailyTicketCount),
+        dailyTicketCountRange: Number(dailyTicketCountRange),
         config: {
           ...config,
           company: { ...(config.company || {}), precioPorTon: Number(precioPorTon) },
@@ -40,10 +53,17 @@ export default function GenerateExcel() {
       // ✅ Ruta ÚNICA del backend
       const res = await api.post("/api/generate-excel", payload, { responseType: "blob" });
 
+      // Generar el nombre del archivo usando las fechas de los inputs
+      const startDateFormatted = startDate.split('-').reverse().join('.'); // yyyy-mm-dd -> dd.mm.yyyy
+      const endDateFormatted = endDate.split('-').reverse().join('.'); // yyyy-mm-dd -> dd.mm.yyyy
+      const filename = `reporte_${startDateFormatted}-${endDateFormatted}.xlsx`;
+
+      console.log('📄 Nombre generado desde inputs:', filename);
+
       const url = window.URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "reporte.xlsx";
+      a.download = filename;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) {
@@ -74,8 +94,33 @@ export default function GenerateExcel() {
         </label>
 
         <label className="label">
-          <b>Ticket inicial</b>
-          <input className="input" type="number" value={ticketInicial} onChange={(e) => setTicketInicial(e.target.value)} />
+          <b>Último ticket registrado</b>
+          <input className="input" type="number" value={lastTicketNumber} onChange={(e) => setLastTicketNumber(e.target.value)} />
+        </label>
+
+        <label className="label">
+          <b>Fecha del último ticket</b>
+          <input className="input" type="date" value={lastTicketDate} onChange={(e) => setLastTicketDate(e.target.value)} />
+        </label>
+
+        <label className="label">
+          <b>Espaciado entre tickets (base)</b>
+          <input className="input" type="number" value={spacingVariance} onChange={(e) => setSpacingVariance(e.target.value)} />
+        </label>
+
+        <label className="label">
+          <b>Variación espaciado (±)</b>
+          <input className="input" type="number" value={spacingVarianceRange} onChange={(e) => setSpacingVarianceRange(e.target.value)} />
+        </label>
+
+        <label className="label">
+          <b>Tickets por día completo (base)</b>
+          <input className="input" type="number" value={dailyTicketCount} onChange={(e) => setDailyTicketCount(e.target.value)} />
+        </label>
+
+        <label className="label">
+          <b>Variación diaria (±)</b>
+          <input className="input" type="number" value={dailyTicketCountRange} onChange={(e) => setDailyTicketCountRange(e.target.value)} />
         </label>
 
         <label className="label">

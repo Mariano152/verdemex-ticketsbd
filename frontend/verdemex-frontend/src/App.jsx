@@ -40,7 +40,7 @@ export default function App() {
               <LeafIcon />
             </div>
             <div className="brandTitle">
-              <b>VerdeMex</b>
+              <b>Control de Residuos</b>
               <span>Generador de Tickets</span>
             </div>
           </div>

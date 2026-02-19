@@ -32,8 +32,26 @@ export default function GenerateTicketsTxt() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const ext = zipMode ? "zip" : "txt";
-      downloadBlob(res.data, `tickets_${Date.now()}.${ext}`);
+      // Intentar obtener el filename del header Content-Disposition
+      let filename = null;
+      const cd = res.headers && (res.headers['content-disposition'] || res.headers['Content-Disposition']);
+      if (cd) {
+        const m = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (m && m[1]) filename = m[1].replace(/['"]/g, '');
+      }
+
+      // Fallback: derivar nombre a partir del excel subido
+      if (!filename && file && file.name) {
+        const base = file.name.replace(/\.xlsx$/i, '');
+        const ticketBase = base.replace(/^reporte_/, 'tickets_');
+        const ext = zipMode ? 'zip' : 'txt';
+        filename = `${ticketBase}.${ext}`;
+      }
+
+      // Último fallback
+      if (!filename) filename = `tickets_${Date.now()}.${zipMode ? 'zip' : 'txt'}`;
+
+      downloadBlob(res.data, filename);
     } catch (e) {
       console.error(e);
       alert("Error generando archivo. Revisa consola y logs de Render.");
