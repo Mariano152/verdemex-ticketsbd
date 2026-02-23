@@ -1,9 +1,11 @@
 const { Pool } = require('pg');
 
-// Conexión a PostgreSQL (funciona en Render, Railway, etc.)
+// Conexión a PostgreSQL (Render, Supabase, etc.)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' 
+    ? { rejectUnauthorized: false } 
+    : false
 });
 
 // Crear tabla si no existe (se ejecuta al iniciar)
@@ -14,6 +16,11 @@ pool.query(`CREATE TABLE IF NOT EXISTS files (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   path TEXT NOT NULL
 )`).catch(err => console.log('Tabla ya existe o error:', err));
+
+// Test de conexión
+pool.query('SELECT NOW()')
+  .then(() => console.log('✅ BD conectada correctamente'))
+  .catch(err => console.error('❌ Error BD:', err));
 
 // Función para guardar archivo
 async function saveFile(name, type, filePath) {
