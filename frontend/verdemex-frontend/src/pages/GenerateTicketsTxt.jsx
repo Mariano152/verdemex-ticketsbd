@@ -42,7 +42,9 @@ export default function GenerateTicketsTxt() {
 
       // Fallback: derivar nombre a partir del excel subido
       if (!filename && file && file.name) {
-        const base = file.name.replace(/\.xlsx$/i, '');
+        // Normalizar: remover (1), (2), (n) que agrega el navegador
+        let base = file.name.replace(/\.xlsx$/i, '');
+        base = base.replace(/\s*\(\d+\)$/, ''); // Remover " (1)", " (2)", etc al final
         const ticketBase = base.replace(/^reporte_/, 'tickets_');
         const ext = zipMode ? 'zip' : 'txt';
         filename = `${ticketBase}.${ext}`;

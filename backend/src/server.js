@@ -140,8 +140,10 @@ app.post("/api/generate-excel", async (req, res) => {
 // -------------------------
 // Helper para convertir nombre de Excel a TXT/ZIP
 function getOutputFilename(excelFilename, extension) {
-  // Remover extensión .xlsx
-  const baseName = excelFilename.replace(/\.xlsx$/i, '');
+  // Normalizar el nombre: remover (1), (2), (n) que agrega el navegador
+  let baseName = excelFilename.replace(/\.xlsx$/i, '');
+  baseName = baseName.replace(/\s*\(\d+\)$/, ''); // Remover " (1)", " (2)", etc al final
+  
   // Reemplazar "reporte_" por "tickets_"
   const ticketName = baseName.replace(/^reporte_/, 'tickets_');
   return `${ticketName}.${extension}`;
