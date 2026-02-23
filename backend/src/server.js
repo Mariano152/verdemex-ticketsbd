@@ -9,7 +9,7 @@ const { generateExcel } = require("./excelGenerator");
 const { loadConfig, saveConfig } = require("./configStore");
 const { excelToTxtBuffer, excelToTicketFiles } = require("./excelToTxt");
 const { formatDateForFilename } = require("./utils");
-const { saveFile, getFiles } = require("./database");
+const { saveFile, getFiles, getFilesByType, getFileById, deleteFile } = require("./database");
 
 const app = express();
 
@@ -225,6 +225,72 @@ app.get("/api/files", async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Error obteniendo archivos" });
+  }
+});
+
+// -------------------------
+// OBTENER ARCHIVOS POR TIPO
+// -------------------------
+app.get("/api/files/type/:type", async (req, res) => {
+  try {
+    const { type } = req.params;
+    const files = await getFilesByType(type);
+    return res.json({ files });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Error obteniendo archivos por tipo" });
+  }
+});
+
+// -------------------------
+// DESCARGAR ARCHIVO POR ID
+// -------------------------
+app.get("/api/files/download/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = await getFileById(id);
+    
+    if (!file) {
+      return res.status(404).json({ error: "Archivo no encontrado" });
+    }
+
+    // Verificar que el archivo existe en el sistema de archivos
+    if (!fs.existsSync(file.path)) {
+      return res.status(404).json({ error: "Archivo no existe en el sistema" });
+    }
+
+    // Descargar el archivo
+    res.download(file.path, file.name);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Error descargando archivo" });
+  }
+});
+
+// -------------------------
+// ELIMINAR ARCHIVO POR ID
+// -------------------------
+app.delete("/api/files/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = await getFileById(id);
+    
+    if (!file) {
+      return res.status(404).json({ error: "Archivo no encontrado" });
+    }
+
+    // Eliminar el archivo del sistema de archivos si existe
+    if (fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+
+    // Eliminar el registro de la base de datos
+    await deleteFile(id);
+
+    return res.json({ ok: true, message: "Archivo eliminado correctamente" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Error eliminando archivo" });
   }
 });
 

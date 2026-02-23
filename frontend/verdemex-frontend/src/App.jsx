@@ -2,11 +2,13 @@ import { useMemo, useState } from "react";
 import Drivers from "./pages/Drivers";
 import GenerateExcel from "./pages/GenerateExcel";
 import GenerateTicketsTxt from "./pages/GenerateTicketsTxt";
+import PreviousMovements from "./pages/PreviousMovements";
 
 const TABS = [
   { key: "drivers", label: "Conductores" },
   { key: "excel", label: "Generar Excel" },
   { key: "tickets", label: "Generar Tickets TXT" },
+  { key: "history", label: "Movimientos Anteriores" },
 ];
 
 function LeafIcon() {
@@ -28,6 +30,7 @@ export default function App() {
   const Page = useMemo(() => {
     if (tab === "excel") return <GenerateExcel />;
     if (tab === "tickets") return <GenerateTicketsTxt />;
+    if (tab === "history") return <PreviousMovements />;
     return <Drivers />;
   }, [tab]);
 
