@@ -8,6 +8,7 @@ const emptyDriver = {
   ticketsPorDia: 1,
   pesoBaseTon: "",
   variacionPct: "",
+  fraccionAccumulador: 0,
   activo: true,
 };
 
@@ -22,6 +23,7 @@ function buildFormFromDriver(driver) {
     ticketsPorDia: Number(driver.ticketsPorDia ?? 1),
     pesoBaseTon: String(driver.pesoBaseTon ?? ""),
     variacionPct: String(driver.variacionPct ?? ""),
+    fraccionAccumulador: Number(driver.fraccionAccumulador ?? 0),
     activo: Boolean(driver.activo ?? true),
   };
 }
@@ -54,8 +56,8 @@ export default function DriverForm({
     if (!nombre) return "Falta nombre";
     if (!placas) return "Falta placas";
     if (!Number.isFinite(taraKg) || taraKg <= 0) return "TaraKg inválida";
-    if (!Number.isFinite(ticketsPorDia) || ticketsPorDia <= 0)
-      return "TicketsPorDia inválido";
+    if (!Number.isFinite(ticketsPorDia) || ticketsPorDia < 0)
+      return "TicketsPorDia inválido (puede ser decimal: 2.5, 0.66, etc)";
     if (!Number.isFinite(pesoBaseTon) || pesoBaseTon <= 0)
       return "Peso base (ton) inválido";
     if (!Number.isFinite(variacionPct) || variacionPct < 0)
@@ -82,6 +84,7 @@ export default function DriverForm({
       ticketsPorDia: Number(form.ticketsPorDia),
       pesoBaseTon: Number(form.pesoBaseTon),
       variacionPct: Number(form.variacionPct),
+      fraccionAccumulador: Number(form.fraccionAccumulador),
       activo: Boolean(form.activo),
     };
 
@@ -122,13 +125,16 @@ export default function DriverForm({
         </label>
 
         <label className="label">
-          <b>Tickets por día</b>
+          <b>Tickets por día (decimal OK)</b>
           <input
             className="input"
             type="number"
+            step="0.01"
+            min="0"
             value={form.ticketsPorDia}
             onChange={(e) => setField("ticketsPorDia", e.target.value)}
           />
+          <small style={{fontSize: '0.8em', color: '#999', marginTop: '4px'}}>Ej: 2.5, 0.66, 3.33</small>
         </label>
 
         <label className="label">

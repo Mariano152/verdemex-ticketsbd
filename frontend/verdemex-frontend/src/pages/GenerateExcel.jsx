@@ -25,8 +25,20 @@ export default function GenerateExcel() {
 
   const generate = async () => {
     if (!startDate || !endDate) return alert("Falta fecha inicio/fin");
+    
+    // ✅ Validación: Fecha fin debe ser >= Fecha inicio
+    if (endDate < startDate) {
+      return alert("❌ Selecciona fecha correcta: La fecha fin debe ser después de la fecha inicio");
+    }
+    
     if (!lastTicketNumber) return alert("Falta último ticket registrado");
     if (!lastTicketDate) return alert("Falta fecha del último ticket");
+    
+    // ✅ Validación: Fecha del último ticket debe ser < Fecha inicio
+    if (lastTicketDate >= startDate) {
+      return alert("❌ Seleccione bien su fecha: El último ticket debe ser ANTES de la fecha inicio del reporte");
+    }
+    
     if (!spacingVariance) return alert("Falta espaciado entre tickets");
     if (!dailyTicketCount) return alert("Falta cantidad de tickets por día");
     if (!config.drivers || config.drivers.length === 0) {
@@ -52,6 +64,20 @@ export default function GenerateExcel() {
 
       // ✅ Ruta ÚNICA del backend
       const res = await api.post("/api/generate-excel", payload, { responseType: "blob" });
+
+      // ✅ NUEVO: Sincronizar config actualizada desde header
+      if (res.headers["x-updated-config"]) {
+        try {
+          const updatedConfig = JSON.parse(res.headers["x-updated-config"]);
+          setConfig(updatedConfig);
+          // Guardar en localStorage
+          const { saveLocalConfig } = await import("../storage.js");
+          saveLocalConfig(updatedConfig);
+          console.log("✅ Config sincronizada: acumuladores de choferes actualizados");
+        } catch (e) {
+          console.warn("⚠️ No se pudo sincronizar config:", e.message);
+        }
+      }
 
       // Generar el nombre del archivo usando las fechas de los inputs
       const startDateFormatted = startDate.split('-').reverse().join('.'); // yyyy-mm-dd -> dd.mm.yyyy

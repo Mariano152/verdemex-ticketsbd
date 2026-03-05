@@ -9,9 +9,10 @@ const { differenceInDays } = require("date-fns");
  * Genera filas de tickets según:
  * - rango fechas (saltando domingos si aplica)
  * - conductores activos
- * - ticketsPorDia por conductor
+ * - ticketsPorDia por conductor (soporta decimales)
  * - horarios rotativos (si ticketsPorDia > horarios.length, repite)
  * - tickets con espaciado inteligente basado en brecha de tiempo
+ * - LÓGICA DE ACUMULADOR FRACTIONAL: permite 0.66, 2.5, 3.33, etc
  *
  * CAMBIOS CLAVE:
  * - TODO a 2 decimales en peso/tara/kg
@@ -19,6 +20,7 @@ const { differenceInDays } = require("date-fns");
  * - KG BRUTO = KG NETO + TARA (2 dec)
  * - Formatos numéricos Excel (0.00) para columnas 7 a 10
  * - Nuevo sistema de numeración de tickets basado en espaciado
+ * - NUEVO: Acumulador con round-half-up para viajes fraccionados
  */
 async function generateExcel({
   config,
@@ -106,6 +108,12 @@ async function generateExcel({
   const decimalsTon = 2;
   const decimalsKg = 2;
 
+  // ✅ NUEVO: Inicializar acumuladores por chofer
+  const driverAccumulators = {};
+  drivers.forEach(d => {
+    driverAccumulators[d.nombre] = Number(d.fraccionAccumulador ?? 0);
+  });
+
   for (const dateObj of dates) {
     // Agregar media día al cambiar de día (excepto el primero)
     if (dateObj > new Date(startDateISO + "T00:00:00")) {
@@ -114,10 +122,20 @@ async function generateExcel({
     }
 
     for (const d of drivers) {
-      const perDay = Number(d.ticketsPorDia) || 0;
-      if (perDay <= 0) continue;
+      const ticketsPerDay = Number(d.ticketsPorDia) ?? 0;
+      
+      // ✅ LÓGICA DE ACUMULADOR FRACTIONAL
+      // Acumular el valor decimal
+      driverAccumulators[d.nombre] += ticketsPerDay;
+      
+      // Calcular viajes con round-half-up: si 2.5 -> 3, si 2.4 -> 2
+      const viajesToday = Math.floor(driverAccumulators[d.nombre] + 0.5);
+      
+      // Restar los viajes realizados del acumulador
+      driverAccumulators[d.nombre] -= viajesToday;
 
-      for (let i = 0; i < perDay; i++) {
+      // Generar filas para cada viaje del día
+      for (let i = 0; i < viajesToday; i++) {
         const horario = (d.horarios && d.horarios.length)
           ? d.horarios[i % d.horarios.length]
           : "";
@@ -186,7 +204,17 @@ async function generateExcel({
   const outPath = path.join(__dirname, "..", "output", outputName);
   await workbook.xlsx.writeFile(outPath);
 
-  return outPath;
+  // ✅ ACTUALIZAR los drivers con los nuevos acumuladores y retornarlos
+  const updatedConfig = { ...config };
+  updatedConfig.drivers = (config.drivers || []).map(d => ({
+    ...d,
+    fraccionAccumulador: roundTo(driverAccumulators[d.nombre] ?? 0, 2)
+  }));
+
+  return {
+    filePath: outPath,
+    updatedConfig: updatedConfig
+  };
 }
 
 module.exports = { generateExcel };

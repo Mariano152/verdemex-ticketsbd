@@ -112,7 +112,9 @@ app.post("/api/generate-excel", async (req, res) => {
     const startDateFormatted = formatDateForFilename(new Date(startDate));
     const endDateFormatted = formatDateForFilename(new Date(endDate));
     const fileName = `reporte_${startDateFormatted}-${endDateFormatted}.xlsx`;
-    const filePath = await generateExcel({
+    
+    // ✅ generateExcel ahora retorna { filePath, updatedConfig }
+    const result = await generateExcel({
       config,
       startDateISO: startDate,
       endDateISO: endDate,
@@ -125,9 +127,22 @@ app.post("/api/generate-excel", async (req, res) => {
       outputName: fileName,
     });
 
+    const { filePath, updatedConfig } = result;
+
+    // ✅ Guardar la config actualizada en el backend (config.json)
+    try {
+      saveConfig(updatedConfig);
+      console.log("✅ Config actualizada: acumuladores de choferes guardados");
+    } catch (e) {
+      console.warn("⚠️ No se pudo guardar config.json en backend (OK si no existe):", e.message);
+    }
+
     // Guardar en base de datos
     await saveFile(fileName, 'excel', filePath);
 
+    // ✅ Retornar la config actualizada en header para que el frontend la sincronice
+    res.setHeader("X-Updated-Config", JSON.stringify(updatedConfig));
+    
     return res.download(filePath, fileName);
   } catch (err) {
     console.error(err);
