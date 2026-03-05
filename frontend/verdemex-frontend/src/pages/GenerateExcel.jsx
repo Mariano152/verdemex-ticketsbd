@@ -13,6 +13,8 @@ export default function GenerateExcel() {
   const [dailyTicketCount, setDailyTicketCount] = useState(80);
   const [dailyTicketCountRange, setDailyTicketCountRange] = useState(10);
   const [precioPorTon, setPrecioPorTon] = useState(520.33);
+  const [holidayDates, setHolidayDates] = useState([]);
+  const [newHolidayDate, setNewHolidayDate] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -60,6 +62,7 @@ export default function GenerateExcel() {
           ...config,
           company: { ...(config.company || {}), precioPorTon: Number(precioPorTon) },
         },
+        holidayDates: holidayDates
       };
 
       // ✅ Ruta ÚNICA del backend
@@ -98,6 +101,19 @@ export default function GenerateExcel() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const addHolidayDate = () => {
+    if (!newHolidayDate) return alert("Selecciona una fecha");
+    if (holidayDates.includes(newHolidayDate)) {
+      return alert("Esta fecha ya está en la lista");
+    }
+    setHolidayDates([...holidayDates, newHolidayDate]);
+    setNewHolidayDate("");
+  };
+
+  const removeHolidayDate = (dateToRemove) => {
+    setHolidayDates(holidayDates.filter(d => d !== dateToRemove));
   };
 
   return (
@@ -153,6 +169,70 @@ export default function GenerateExcel() {
           <b>Precio por Ton</b>
           <input className="input" type="number" step="0.01" value={precioPorTon} onChange={(e) => setPrecioPorTon(e.target.value)} />
         </label>
+      </div>
+
+      {/* Sección Días Festivos */}
+      <div style={{ marginTop: 16, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8 }}>
+        <h4 style={{ marginTop: 0, marginBottom: 10 }}>📅 Días Festivos (Opcional)</h4>
+        <p className="small muted" style={{ marginBottom: 10 }}>
+          Los días festivos se tratan como domingos: la báscula sigue abierta pero no se genera fila.
+        </p>
+        
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 10 }}>
+          <label className="label" style={{ marginBottom: 0, flex: 1 }}>
+            <b style={{ fontSize: "0.9em" }}>Agregar fecha</b>
+            <input 
+              className="input" 
+              type="date" 
+              value={newHolidayDate} 
+              onChange={(e) => setNewHolidayDate(e.target.value)}
+              style={{ marginBottom: 0 }}
+            />
+          </label>
+          <button 
+            className="btn btnPrimary" 
+            onClick={addHolidayDate}
+            style={{ padding: "8px 16px" }}
+          >
+            Agregar
+          </button>
+        </div>
+
+        {holidayDates.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {holidayDates.map((date) => (
+              <div 
+                key={date}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  backgroundColor: "#fff",
+                  border: "1px solid #ddd",
+                  borderRadius: 4
+                }}
+              >
+                <span>{date}</span>
+                <button
+                  onClick={() => removeHolidayDate(date)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#d32f2f",
+                    fontSize: "1.2em",
+                    padding: 0,
+                    lineHeight: 1
+                  }}
+                  title="Remover"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>

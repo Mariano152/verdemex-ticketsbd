@@ -88,7 +88,7 @@ app.post("/api/config", (req, res) => {
 // -------------------------
 app.post("/api/generate-excel", async (req, res) => {
   try {
-    const { startDate, endDate, lastTicketNumber, lastTicketDate, spacingVariance, spacingVarianceRange, dailyTicketCount, dailyTicketCountRange, config } = req.body;
+    const { startDate, endDate, lastTicketNumber, lastTicketDate, spacingVariance, spacingVarianceRange, dailyTicketCount, dailyTicketCountRange, config, holidayDates } = req.body;
 
     if (!startDate || !endDate) {
       return res.status(400).json({ error: "Falta startDate o endDate" });
@@ -125,6 +125,7 @@ app.post("/api/generate-excel", async (req, res) => {
       dailyTicketCount: Number(dailyTicketCount),
       dailyTicketCountRange: Number(dailyTicketCountRange),
       outputName: fileName,
+      holidayDates: holidayDates || []
     });
 
     const { filePath, updatedConfig } = result;

@@ -32,7 +32,8 @@ async function generateExcel({
   spacingVarianceRange,
   dailyTicketCount,
   dailyTicketCountRange,
-  outputName
+  outputName,
+  holidayDates = []
 }) {
   const { company, rules } = config;
 
@@ -42,7 +43,7 @@ async function generateExcel({
   }
 
   const skipSundays = Boolean(config?.rules?.skipSundays ?? true);
-  const dates = buildDateList(startDateISO, endDateISO, skipSundays);
+  const dates = buildDateList(startDateISO, endDateISO, skipSundays, holidayDates);
 
   // Calcular el ticket inicial considerando la brecha
   let ticket = calculateInitialTicket(
@@ -51,7 +52,8 @@ async function generateExcel({
     startDateISO,
     Number(spacingVariance),
     Number(dailyTicketCount),
-    skipSundays
+    skipSundays,
+    holidayDates
   );
 
   const workbook = new ExcelJS.Workbook();

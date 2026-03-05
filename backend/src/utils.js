@@ -5,17 +5,30 @@ const { eachDayOfInterval, differenceInDays } = require("date-fns");
 /**
  * Devuelve array de Date entre start y end (ISO yyyy-mm-dd).
  * Si skipSundays = true, elimina domingos.
+ * Si se proporcionan holidayDates (array ISO yyyy-mm-dd), también los elimina.
  */
-function buildDateList(startISO, endISO, skipSundays = true) {
+function buildDateList(startISO, endISO, skipSundays = true, holidayDates = []) {
   const start = new Date(startISO + "T00:00:00");
   const end = new Date(endISO + "T00:00:00");
 
   const days = eachDayOfInterval({ start, end });
 
-  if (!skipSundays) return days;
+  // Crear set de fechas festivas para búsqueda O(1)
+  const holidaySet = new Set(
+    (holidayDates || []).map(h => new Date(h + "T00:00:00").toISOString().split('T')[0])
+  );
 
-  // Domingo = 0
-  return days.filter((d) => d.getDay() !== 0);
+  // Filtrar domingos y días festivos
+  return days.filter((d) => {
+    const dayISO = d.toISOString().split('T')[0];
+    const isSunday = d.getDay() === 0;
+    const isHoliday = holidaySet.has(dayISO);
+    
+    if (skipSundays && isSunday) return false;
+    if (isHoliday) return false;
+    
+    return true;
+  });
 }
 
 /** Formato DD/MM/YYYY para nombres de archivos */
@@ -64,6 +77,9 @@ function tonToKg(ton, decimalsKg = 2) {
 
 /**
  * Calcula el ticket inicial considerando la brecha desde el último ticket registrado.
+ * Ahora cuenta domingos y días festivos como DÍA COMPLETO (1.0) - no se generan filas pero la báscula funciona.
+ * 
+ * Lógica: Sábado (0.5 tarde) + Domingo festivo (1.0 día completo) + Lunes (0 mañana) = 1.5 días
  * 
  * @param {number} lastTicketNumber - Último número de ticket registrado
  * @param {string} lastTicketDate - Fecha del último ticket (ISO yyyy-mm-dd)
@@ -71,6 +87,7 @@ function tonToKg(ton, decimalsKg = 2) {
  * @param {number} spacingVariance - Espaciado entre tickets en el mismo día (base)
  * @param {number} dailyTicketCount - Cantidad de tickets por día completo (base)
  * @param {boolean} skipSundays - Si se saltan domingos
+ * @param {array} holidayDates - Array de fechas festivas (ISO yyyy-mm-dd)
  * 
  * @returns {number} - El ticket number con el que comenzar
  */
@@ -80,7 +97,8 @@ function calculateInitialTicket(
   startDate,
   spacingVariance,
   dailyTicketCount,
-  skipSundays = true
+  skipSundays = true,
+  holidayDates = []
 ) {
   const lastDate = new Date(lastTicketDate + "T00:00:00");
   const startDateObj = new Date(startDate + "T00:00:00");
@@ -96,23 +114,33 @@ function calculateInitialTicket(
 
   let nextTicket = Number(lastTicketNumber);
 
-  // Desde la fecha del último ticket (0.5 day):
+  // Crear set de fechas festivas para búsqueda O(1)
+  const holidaySet = new Set(
+    (holidayDates || []).map(h => new Date(h + "T00:00:00").toISOString().split('T')[0])
+  );
+
+  // Desde la fecha del último ticket (tarde = 0.5):
   // Agregamos media día de capacidad
   nextTicket += dailyTicketCount / 2;
 
-  // Para cada día completo entre last y start (excluyendo el último)
+  // Para cada día entre last y start
   for (let i = 1; i < daysBetween; i++) {
-    // Verificar si es domingo y si se debe saltar
+    // Verificar si es domingo o festivo
     const dayToCheck = new Date(lastDate);
     dayToCheck.setDate(dayToCheck.getDate() + i);
     
-    if (skipSundays && dayToCheck.getDay() === 0) {
-      // No agregar tickets para domingo
-      continue;
+    const dayISO = dayToCheck.toISOString().split('T')[0];
+    const isSunday = dayToCheck.getDay() === 0;
+    const isHoliday = holidaySet.has(dayISO);
+
+    if ((skipSundays && isSunday) || isHoliday) {
+      // Día festivo/domingo: no se genera fila, pero la báscula funciona
+      // Cuenta como DÍA COMPLETO de capacidad
+      nextTicket += dailyTicketCount;
+    } else {
+      // Día normal: agregar capacidad de un día completo
+      nextTicket += dailyTicketCount;
     }
-    
-    // Agregar capacidad de un día completo
-    nextTicket += dailyTicketCount;
   }
 
   // Nota: Se agregará media día más al llegar a la fecha de inicio
