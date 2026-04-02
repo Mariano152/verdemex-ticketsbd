@@ -1,0 +1,343 @@
+import { useState, useEffect, useCallback } from 'react';
+import api from '../api';
+import '../styles/PhotoReport.css';
+
+// Función para formatear fechas como DD-MM-YYYY
+const formatDateDMY = (dateStr) => {
+  if (!dateStr || dateStr === 'Invalid Date') return '??-??-????';
+  
+  // Si viene en formato ISO (2026-03-20T06:00:00.000Z), extraer solo YYYY-MM-DD
+  if (dateStr.includes('T')) {
+    dateStr = dateStr.split('T')[0];
+  }
+  
+  const [year, month, day] = dateStr.split('-');
+  return `${day}-${month}-${year}`;
+};
+
+export default function PhotoReport({ companyId }) {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // Calcular rango de fechas permitidas para el mes seleccionado (TODO EL MES)
+  const getDateRange = () => {
+    const firstDay = new Date(year, month - 1, 1).toISOString().split('T')[0];
+    const lastDay = new Date(year, month, 0).toISOString().split('T')[0];
+    return { firstDay, lastDay };
+  };
+
+  const dateRange = getDateRange();
+
+  // Cargar fotos cuando cambien año o mes
+  const loadPhotos = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get(
+        `/api/companies/${companyId}/photos/${year}/${String(month).padStart(2, '0')}`
+      );
+      setPhotos(response.data.photos || []);
+    } catch (err) {
+      setError('Error al cargar fotos: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, year, month]);
+
+  useEffect(() => {
+    if (companyId) {
+      loadPhotos();
+    }
+  }, [companyId, loadPhotos]);
+
+  const handleDateChange = (e) => {
+    setSelectedDate(e.target.value);
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+      setError('❌ Solo se permiten imágenes (JPG, PNG, GIF)');
+      return;
+    }
+
+    // Validar que la fecha esté en el mes/año seleccionado
+    const [photoYear, photoMonth] = selectedDate.split('-').map(Number);
+    if (photoYear !== year || photoMonth !== month) {
+      setError(`❌ La fecha debe estar en ${monthNames[month - 1]} de ${year}`);
+      return;
+    }
+
+    // Intentar mostrar preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreviewImage({
+        src: e.target.result,
+        hasError: false
+      });
+    };
+    reader.readAsDataURL(file);
+
+    setUploading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('photo_date', selectedDate);
+
+      await api.post(
+        `/api/companies/${companyId}/photos`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        }
+      );
+
+      setSuccess(`✅ Foto del ${formatDateDMY(selectedDate)} subida correctamente`);
+      setPreviewImage(null);
+      await loadPhotos();
+      e.target.value = '';
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('❌ Error al subir foto: ' + (err.response?.data?.error || err.message));
+      // Mostrar como card si hubo error
+      setPreviewImage({
+        src: null,
+        hasError: true,
+        date: selectedDate,
+        filename: file.name
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeletePhoto = async (photoId) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar esta foto?')) return;
+
+    try {
+      await api.delete(`/api/companies/${companyId}/photos/${photoId}`);
+      setSuccess('Foto eliminada correctamente');
+      await loadPhotos();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Error al eliminar foto: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleGeneratePDF = async () => {
+    try {
+      const response = await api.get(
+        `/api/companies/${companyId}/photos/report/${year}/${String(month).padStart(2, '0')}`,
+        { responseType: 'blob' }
+      );
+
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `reporte-fotos-${year}-${String(month).padStart(2, '0')}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Error al generar PDF: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const downloadPhoto = async (photoUrl, filename) => {
+    try {
+      const response = await api.get(photoUrl, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error descargando foto:', error);
+      alert('Error descargando la foto');
+    }
+  };
+
+  const monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const startYear = 2025; // Año mínimo disponible
+  const endYear = currentYear + 2; // Año actual + 2
+  const years = Array.from(
+    { length: endYear - startYear + 1 },
+    (_, i) => endYear - i // Descendente para mejor UX
+  );
+
+  // Agrupar fotos por fecha
+  const photosByDate = photos.reduce((acc, photo) => {
+    if (!acc[photo.photo_date]) {
+      acc[photo.photo_date] = [];
+    }
+    acc[photo.photo_date].push(photo);
+    return acc;
+  }, {});
+
+  const sortedDates = Object.keys(photosByDate).sort();
+
+  return (
+    <div className="photo-report-container">
+      <h2>📸 Reporte Fotográfico</h2>
+
+      {/* Selector de mes y año */}
+      <div className="date-selector">
+        <div className="selector-group">
+          <label htmlFor="month">Mes:</label>
+          <select
+            id="month"
+            value={month}
+            onChange={(e) => setMonth(parseInt(e.target.value))}
+          >
+            {monthNames.map((name, idx) => (
+              <option key={idx + 1} value={idx + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="selector-group">
+          <label htmlFor="year">Año:</label>
+          <select value={year} onChange={(e) => setYear(parseInt(e.target.value))}>
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          className="btn-primary"
+          onClick={handleGeneratePDF}
+          disabled={sortedDates.length === 0 || loading}
+        >
+          📄 Descargar PDF
+        </button>
+      </div>
+
+      {/* Selector de fecha para subir */}
+      <div className="upload-section">
+        <h4 style={{ marginTop: 0, marginBottom: 15, color: '#333' }}>📤 Subir nueva foto</h4>
+        <div className="upload-controls">
+          <div className="upload-group">
+            <label htmlFor="photo-date">
+              Fecha de la foto ({monthNames[month - 1]} {year}):
+            </label>
+            <input
+              id="photo-date"
+              type="date"
+              value={selectedDate}
+              onChange={handleDateChange}
+              min={dateRange.firstDay}
+              max={dateRange.lastDay}
+            />
+          </div>
+
+          <div className="upload-group">
+            <label htmlFor="photo-input">Seleccionar archivo (JPG, PNG, GIF):</label>
+            <input
+              id="photo-input"
+              type="file"
+              accept="image/jpeg,image/png,image/gif"
+              onChange={handlePhotoUpload}
+              disabled={uploading}
+            />
+          </div>
+        </div>
+
+        {previewImage && (
+          <div className="preview-section">
+            <p style={{ margin: '10px 0 5px 0', fontSize: '12px', fontWeight: '500', color: '#666' }}>
+              📷 Vista previa:
+            </p>
+            {previewImage.src && !previewImage.hasError ? (
+              <img 
+                src={previewImage.src} 
+                alt="Preview" 
+                style={{ 
+                  maxHeight: '150px', 
+                  borderRadius: '6px',
+                  border: '2px solid #4CAF50'
+                }} 
+              />
+            ) : (
+              <div className="preview-card">
+                <div className="preview-card-date">📅 {formatDateDMY(previewImage.date || selectedDate)}</div>
+                <div className="preview-card-filename">{previewImage.filename || 'Archivo'}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {uploading && <p className="loading">⏳ Subiendo foto...</p>}
+      </div>
+
+      {/* Mensajes */}
+      {error && <div className="message error">{error}</div>}
+      {success && <div className="message success">{success}</div>}
+
+      {/* Galería de fotos */}
+      <div className="gallery-section">
+        {loading ? (
+          <p className="loading">Cargando fotos...</p>
+        ) : sortedDates.length === 0 ? (
+          <p className="no-photos">No hay fotos para {monthNames[month - 1]} de {year}</p>
+        ) : (
+          <div className="gallery">
+            {sortedDates.map((date) => {
+              // Validar que la fecha sea válida
+              if (!date || date === 'Invalid Date') return null;
+              
+              return (
+                <div key={date} className="photos-grid">
+                  {photosByDate[date].map((photo) => (
+                    <div 
+                      key={photo.id} 
+                      className="photo-card"
+                      onClick={() => downloadPhoto(photo.url, photo.filename)}
+                      title="Haz clic para descargar la foto"
+                    >
+                      <button
+                        className="btn-delete-photo"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePhoto(photo.id);
+                        }}
+                        title="Eliminar esta foto"
+                      >
+                        ✕
+                      </button>
+                      <div className="photo-info">
+                        <div className="photo-date">📅 {formatDateDMY(date)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

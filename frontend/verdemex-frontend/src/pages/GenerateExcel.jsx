@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import api from "../api";
 import { getDefaultConfig, loadLocalConfig } from "../storage";
 
-export default function GenerateExcel() {
+export default function GenerateExcel({ companyId }) {
   const [config, setConfig] = useState(getDefaultConfig());
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -62,7 +62,8 @@ export default function GenerateExcel() {
           ...config,
           company: { ...(config.company || {}), precioPorTon: Number(precioPorTon) },
         },
-        holidayDates: holidayDates
+        holidayDates: holidayDates,
+        companyId
       };
 
       // ✅ Ruta ÚNICA del backend

@@ -1,0 +1,406 @@
+.companySelectContainer {
+  min-height: 100vh;
+  background: 
+    radial-gradient(900px 380px at 10% 0%, rgba(132,204,22,.20), transparent 60%),
+    radial-gradient(800px 360px at 90% 10%, rgba(19,122,54,.18), transparent 55%),
+    linear-gradient(180deg, #f4fbf4, #ffffff 55%, #f4fbf4);
+  padding: 40px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+}
+
+.companyHeader {
+  text-align: center;
+  color: #06381b;
+  margin-bottom: 40px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.companyHeader > div {
+  flex: 1;
+}
+
+.companyHeader h2 {
+  font-size: 2rem;
+  margin: 0 0 8px 0;
+}
+
+.companyHeader h2 span {
+  font-weight: 700;
+  color: #137a36;
+}
+
+.roleLabel {
+  font-size: 0.95rem;
+  opacity: 0.8;
+  margin: 8px 0 0 0;
+  color: #0b4a24;
+}
+
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: #06381b;
+  font-size: 1.1rem;
+}
+
+.companyContent {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.companyContent h3 {
+  color: #06381b;
+  margin-bottom: 24px;
+  font-size: 1.2rem;
+}
+
+.errorAlert {
+  background-color: #fee;
+  border-left: 4px solid #c33;
+  color: #c33;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.companiesList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.companyCard {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.companyCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+}
+
+.companyInfo h4 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.companyInfo small {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.companyActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.enterBtn {
+  flex: 1;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #0f5a2a 0%, #137a36 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.enterBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(19, 122, 54, 0.3);
+}
+
+.deleteBtn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: #fee;
+  color: #c33;
+  border: 1px solid #fdd;
+  border-radius: 6px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.deleteBtn:hover {
+  background: #fdd;
+  color: #b22;
+}
+
+.noCompanies {
+  text-align: center;
+  color: #06381b;
+  font-size: 1.1rem;
+  padding: 40px 20px;
+}
+
+.createCompanySection {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.createBtn {
+  width: 100%;
+  padding: 12px;
+  background: #137a36;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.createBtn:hover {
+  background: #0f5a2a;
+  transform: translateY(-2px);
+}
+
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.createForm input {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.createForm input:focus {
+  outline: none;
+  border-color: #137a36;
+  box-shadow: 0 0 0 3px rgba(19, 122, 54, 0.1);
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+}
+
+.submitBtn {
+  flex: 1;
+  padding: 10px;
+  background: #137a36;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.submitBtn:hover {
+  background: #0f5a2a;
+}
+
+.cancelBtn {
+  flex: 1;
+  padding: 10px;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cancelBtn:hover {
+  background: #e0e0e0;
+}
+
+.backBtn {
+  padding: 10px 16px;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.backBtn:hover {
+  background: #e0e0e0;
+}
+
+.sectionTabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  justify-content: center;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0;
+}
+
+.sectionTab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #06381b;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.sectionTab:hover {
+  color: #137a36;
+}
+
+.sectionTab.active {
+  border-bottom-color: #137a36;
+  color: #137a36;
+}
+
+.adminUserSection {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.adminUserSection h4 {
+  margin: 0 0 16px 0;
+  color: #06381b;
+  font-size: 1.1rem;
+}
+
+.userForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.userForm input,
+.userForm select {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.userForm input:focus,
+.userForm select:focus {
+  outline: none;
+  border-color: #137a36;
+  box-shadow: 0 0 0 3px rgba(19, 122, 54, 0.1);
+}
+
+.userForm button {
+  padding: 10px;
+  background: #137a36;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 4px;
+}
+
+.userForm button:hover {
+  background: #0f5a2a;
+}
+
+.usersList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.userItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.userInfo {
+  flex: 1;
+}
+
+.userInfo strong {
+  display: block;
+  color: #06381b;
+  margin-bottom: 4px;
+}
+
+.userInfo small {
+  display: block;
+  color: #999;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.createdDate {
+  display: block;
+  color: #bbb;
+  font-size: 0.8rem;
+}
+
+.userActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.userActions select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.userActions select.roleAdmin {
+  background-color: #f0f8ff;
+  border-color: #137a36;
+  color: #137a36;
+  font-weight: 600;
+}
+
+.userActions select.roleUser {
+  background-color: #f5f5f5;
+  border-color: #999;
+  color: #666;
+}
+
+.successAlert {
+  background-color: #efe;
+  border-left: 4px solid #3c3;
+  color: #3c3;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}

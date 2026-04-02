@@ -1,0 +1,307 @@
+.adminPanelContainer {
+  min-height: 100vh;
+  background: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+}
+
+.adminHeader {
+  background: linear-gradient(135deg, #0f5a2a 0%, #137a36 100%);
+  color: white;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.adminTitle h1 {
+  margin: 0 0 4px 0;
+  font-size: 1.8rem;
+}
+
+.adminTitle p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 0.95rem;
+}
+
+.adminActions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.userInfo {
+  opacity: 0.9;
+  font-size: 0.95rem;
+}
+
+.logoutBtn {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.logoutBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.adminTabs {
+  display: flex;
+  gap: 0;
+  background: white;
+  border-bottom: 1px solid #ddd;
+  padding: 0;
+}
+
+.tab {
+  padding: 16px 24px;
+  background: white;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #888;
+  transition: all 0.3s;
+}
+
+.tab:hover {
+  color: #667eea;
+  border-bottom-color: #e0e0e0;
+}
+
+.tab.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+}
+
+.adminContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.errorAlert {
+  background-color: #fee;
+  border-left: 4px solid #c33;
+  color: #c33;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.successAlert {
+  background-color: #efe;
+  border-left: 4px solid #3c3;
+  color: #3c3;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.tabContent {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+}
+
+.adminSection {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.adminSection h2 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 1.3rem;
+}
+
+.adminForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adminForm input,
+.adminForm select {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: border-color 0.3s;
+}
+
+.adminForm input:focus,
+.adminForm select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.adminForm button {
+  padding: 10px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+  margin-top: 8px;
+}
+
+.adminForm button:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+}
+
+.usersList,
+.companiesList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.userItem,
+.companyItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  transition: all 0.2s;
+}
+
+.userItem:hover,
+.companyItem:hover {
+  background: #f5f5f5;
+  border-color: #ddd;
+}
+
+.userInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.userInfo strong,
+.companyInfo strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.userInfo small,
+.companyInfo small {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.createdDate {
+  color: #bbb;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.userActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.userActions select {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.roleAdmin {
+  border-color: #764ba2;
+  background-color: #f0e6ff;
+}
+
+.roleUser {
+  border-color: #4CAF50;
+  background-color: #f1f8f4;
+}
+
+.deleteBtn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: #fee;
+  color: #c33;
+  border: 1px solid #fdd;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deleteBtn:hover {
+  background: #fdd;
+  color: #b22;
+  border-color: #fcc;
+}
+
+.companyInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .adminHeader {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .adminActions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .adminTabs {
+    flex-direction: column;
+  }
+
+  .tab {
+    border-bottom: none;
+    border-left: 3px solid transparent;
+    text-align: left;
+  }
+
+  .tab.active {
+    border-left-color: #667eea;
+    border-bottom: none;
+  }
+
+  .tabContent {
+    grid-template-columns: 1fr;
+  }
+
+  .userActions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .userActions select,
+  .deleteBtn {
+    width: 100%;
+  }
+}

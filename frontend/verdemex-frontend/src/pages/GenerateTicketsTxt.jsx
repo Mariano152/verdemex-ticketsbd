@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { api } from "../api";
+import api from "../api";
 
-export default function GenerateTicketsTxt() {
+export default function GenerateTicketsTxt({ companyId }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [zipMode, setZipMode] = useState(false);
@@ -24,6 +24,7 @@ export default function GenerateTicketsTxt() {
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("companyId", companyId);
 
       const endpoint = zipMode ? "/api/excel-to-txt-zip" : "/api/excel-to-txt";
 

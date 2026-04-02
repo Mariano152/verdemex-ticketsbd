@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { api } from "../api";
+import { useEffect, useState, useCallback } from "react";
+import api from "../api";
 
-export default function PreviousMovements() {
+export default function PreviousMovements({ companyId }) {
   const [activeTab, setActiveTab] = useState("excel");
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -14,15 +14,16 @@ export default function PreviousMovements() {
   ];
 
   // Cargar archivos cuando cambia la pestaña
-  useEffect(() => {
-    loadFiles();
-  }, [activeTab]);
-
-  const loadFiles = async () => {
+  const loadFiles = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await api.get(`/api/files/type/${activeTab}`);
+      const cId = parseInt(companyId, 10);
+      if (!cId) {
+        setError("No se detectó la empresa");
+        return;
+      }
+      const res = await api.get(`/api/companies/${cId}/files/type/${activeTab}`);
       setFiles(res.data.files || []);
     } catch (err) {
       console.error(err);
@@ -31,7 +32,11 @@ export default function PreviousMovements() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, companyId]);
+
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles]);
 
   const downloadFile = async (fileId, fileName) => {
     try {
