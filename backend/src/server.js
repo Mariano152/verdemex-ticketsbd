@@ -122,6 +122,17 @@ app.post("/api/auth/change-password", authMiddleware, async (req, res) => {
   }
 });
 
+// DEBUG: Verificar usuarios en BD
+app.get("/api/debug/users", async (req, res) => {
+  try {
+    console.log("📋 DEBUG: Listando todos los usuarios...");
+    const users = await db.getAllUsers();
+    return res.json({ ok: true, count: users.length, users: users.map(u => ({ id: u.id, username: u.username, email: u.email, role: u.role })) });
+  } catch (err) {
+    return res.status(500).json({ error: "Error listando usuarios: " + err.message });
+  }
+});
+
 // ============================================
 // 👥 RUTAS DE USUARIOS (ADMIN ONLY)
 // ============================================

@@ -85,11 +85,13 @@ async function createUser(username, email, passwordHash, role = 'user') {
 
 async function getUserByUsername(username) {
   try {
+    console.log(`📊 BD: Buscando usuario "${username}" en tabla "users"...`);
     const query = 'SELECT * FROM users WHERE username = $1 AND deleted_at IS NULL';
     const result = await pool.query(query, [username]);
+    console.log(`📊 BD: Resultado: ${result.rows.length} fila(s) encontrada(s)`);
     return result.rows[0];
   } catch (err) {
-    console.error('Error obteniendo usuario:', err);
+    console.error('❌ Error obteniendo usuario:', err.message);
     throw err;
   }
 }

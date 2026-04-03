@@ -20,11 +20,20 @@ async function registerUser(username, email, password, role = 'user', db) {
 
 // Login
 async function loginUser(username, password, db) {
+  console.log(`🔍 Buscando usuario: ${username}`);
   const user = await db.getUserByUsername(username);
-  if (!user) throw new Error('Usuario no encontrado');
   
+  if (!user) {
+    console.error(`❌ Usuario "${username}" no encontrado en BD`);
+    throw new Error('Usuario no encontrado');
+  }
+  
+  console.log(`✅ Usuario encontrado: ${user.username}`);
   const validPassword = await bcrypt.compare(password, user.password_hash);
-  if (!validPassword) throw new Error('Contraseña incorrecta');
+  if (!validPassword) {
+    console.error(`❌ Contraseña incorrecta para ${username}`);
+    throw new Error('Contraseña incorrecta');
+  }
   
   const token = jwt.sign(
     { 
