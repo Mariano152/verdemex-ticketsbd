@@ -341,14 +341,19 @@ app.post("/api/generate-excel", authMiddleware, async (req, res) => {
 
     const { filePath, updatedConfig } = result;
     
-    // Guardar en BD
-    await db.saveFileWithCompany(companyId, req.user.userId, fileName, 'excel', filePath);
+    // Leer el archivo generado como buffer
+    const fileBuffer = fs.readFileSync(filePath);
+    
+    // Guardar en BD como BLOB
+    await db.saveFileWithCompanyAndData(companyId, req.user.userId, fileName, 'excel', fileBuffer);
     
     // Guardar config en BD
     await db.saveCompanyConfig(companyId, updatedConfig);
     
     res.setHeader("X-Updated-Config", JSON.stringify(updatedConfig));
-    return res.download(filePath, fileName);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return res.send(fileBuffer);
   } catch (err) {
     console.error(err);
     return res.status(400).json({ error: err.message });
@@ -366,13 +371,13 @@ app.post("/api/excel-to-txt", authMiddleware, upload.single("file"), async (req,
     const buf = await excelToTxtBuffer(req.file.buffer);
     const uniqueId = Date.now();
     const outName = getOutputFilename(req.file.originalname, 'txt', uniqueId);
-    const outPath = path.join(outDir, outName);
-    fs.writeFileSync(outPath, buf);
 
-    // Guardar en BD
-    await db.saveFileWithCompany(companyId, req.user.userId, outName, 'txt', outPath);
+    // Guardar directamente como BLOB (sin pasar por filesystem)
+    await db.saveFileWithCompanyAndData(companyId, req.user.userId, outName, 'txt', buf);
 
-    return res.download(outPath, outName);
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${outName}"`);
+    return res.send(buf);
   } catch (err) {
     console.error(err);
     return res.status(400).json({ error: err.message });
@@ -390,13 +395,13 @@ app.post("/api/excel-to-txt-zip", authMiddleware, upload.single("file"), async (
     const files = await excelToTicketFiles(req.file.buffer);
     const uniqueId = Date.now();
     const zipName = getOutputFilename(req.file.originalname, 'zip', uniqueId);
-    const zipPath = path.join(outDir, zipName);
 
-    const output = fs.createWriteStream(zipPath);
+    // Crear ZIP en memoria (sin guardar en disco)
+    const buffers = [];
     const archive = archiver("zip", { zlib: { level: 9 } });
 
     archive.on("error", (err) => { throw err; });
-    archive.pipe(output);
+    archive.on("data", (data) => { buffers.push(data); });
 
     for (const f of files) {
       archive.append(f.content, { name: f.name });
@@ -404,18 +409,15 @@ app.post("/api/excel-to-txt-zip", authMiddleware, upload.single("file"), async (
 
     await archive.finalize();
 
-    await new Promise((resolve, reject) => {
-      output.on('close', resolve);
-      output.on('error', reject);
-    });
+    // Combinar todos los buffers del ZIP
+    const zipBuffer = Buffer.concat(buffers);
 
-    // Guardar en BD
-    await db.saveFileWithCompany(companyId, req.user.userId, zipName, 'zip', zipPath);
+    // Guardar en BD como BLOB
+    await db.saveFileWithCompanyAndData(companyId, req.user.userId, zipName, 'zip', zipBuffer);
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
-    const zipStream = fs.createReadStream(zipPath);
-    zipStream.pipe(res);
+    return res.send(zipBuffer);
   } catch (err) {
     console.error(err);
     return res.status(400).json({ error: err.message });
@@ -478,15 +480,34 @@ app.get("/api/companies/:companyId/files/type/:type", authMiddleware, async (req
 app.get("/api/files/download/:id", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const file = await db.getFileById(id);
+    
+    // Intentar obtener con file_data (BLOB)
+    const file = await db.getFileByIdWithData(id);
     
     if (!file) {
       return res.status(404).json({ error: "Archivo no encontrado en BD" });
     }
 
+    // Si tiene file_data (guardado como BLOB), enviar desde memoria
+    if (file.file_data) {
+      console.log(`📥 Descargando desde BD (BLOB): ${file.name}`);
+      res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+      
+      // Configurar tipo MIME según el tipo de archivo
+      if (file.type === 'excel') {
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      } else if (file.type === 'txt') {
+        res.setHeader('Content-Type', 'text/plain');
+      } else if (file.type === 'zip') {
+        res.setHeader('Content-Type', 'application/zip');
+      }
+      
+      return res.send(file.file_data);
+    }
+
+    // Si no tiene file_data, intentar desde filesystem (legado)
     let filePath = file.path;
 
-    // Si el archivo no existe en la ruta esperada, intentar encontrarlo
     if (!fs.existsSync(filePath)) {
       console.warn(`⚠️ Archivo no encontrado en ruta esperada: ${filePath}`);
       console.warn(`📁 Buscando en: ${outDir}`);
@@ -500,54 +521,23 @@ app.get("/api/files/download/:id", authMiddleware, async (req, res) => {
         console.log(`🔍 Buscando archivo base: "${baseNameWithoutExt}", extensión: "${ext}"`);
         console.log(`📂 Archivos disponibles en output: ${outputFiles.join(', ')}`);
         
-        // Estrategia de búsqueda (por prioridad):
-        // 1) Coincidencia exacta del nombre completo
-        // 2) Archivo que comience por la fecha y contenga la extensión
-        // 3) Archivo con el patrón baseNombre_*
-        let foundFile = null;
-        
-        // Estrategia 1: Coincidencia exacta
-        foundFile = outputFiles.find(f => f === fileName);
-        if (foundFile) {
-          console.log(`✅ Encontrado por coincidencia exacta: ${foundFile}`);
-        }
-        
-        // Estrategia 2: Mismo tipo de archivo (extensión)
+        let foundFile = outputFiles.find(f => f === fileName);
         if (!foundFile) {
           foundFile = outputFiles.find(f => {
             return f.endsWith(ext) && f.startsWith(baseNameWithoutExt);
           });
-          if (foundFile) {
-            console.log(`✅ Encontrado por patrón de nombre: ${foundFile}`);
-          }
         }
-        
-        // Estrategia 3: Cualquier archivo con la misma extensión y similar al nombre
         if (!foundFile) {
           foundFile = outputFiles.find(f => f.endsWith(ext));
-          if (foundFile) {
-            console.log(`⚠️ Encontrado por extensión (pero puede no ser el correcto): ${foundFile}`);
-          }
         }
         
         if (foundFile) {
           const newPath = path.join(outDir, foundFile);
           filePath = newPath;
           console.log(`✅ Ruta corregida: ${newPath}`);
-          
-          // Actualizar BD con la ruta correcta
-          try {
-            await db.pool.query(
-              'UPDATE files SET path = $1 WHERE id = $2',
-              [newPath, id]
-            );
-            console.log(`✅ BD actualizada con ruta correcta para archivo ID: ${id}`);
-          } catch (dbErr) {
-            console.error(`⚠️ Error actualizando BD, pero continuando con descarga: ${dbErr.message}`);
-          }
         } else {
           console.error(`❌ No se encontró archivo en ${outDir}`);
-          return res.status(404).json({ error: "Archivo no encontrado en el servidor" });
+          return res.status(404).json({ error: "Archivo no encontrado" });
         }
       } catch (err) {
         console.error(`❌ Error buscando archivo: ${err.message}`);
@@ -555,13 +545,7 @@ app.get("/api/files/download/:id", authMiddleware, async (req, res) => {
       }
     }
 
-    // Verificar existencia final
-    if (!fs.existsSync(filePath)) {
-      console.error(`❌ Archivo final no encontrado: ${filePath}`);
-      return res.status(404).json({ error: "Archivo no existe en el servidor" });
-    }
-
-    console.log(`📥 Descargando archivo: ${filePath}`);
+    console.log(`📥 Descargando desde disco: ${filePath}`);
     res.download(filePath, file.name);
   } catch (err) {
     console.error(`❌ Error en descarga: ${err.message}`);

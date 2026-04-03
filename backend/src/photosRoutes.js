@@ -35,32 +35,18 @@ router.post('/', authMiddleware, uploadPhoto.single('photo'), async (req, res) =
       return res.status(400).json({ error: 'Solo se aceptan imágenes' });
     }
 
-    // Crear ruta: output/photos/{companyId}/{year}/{month}/
-    const date = new Date(photo_date);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const companyPhotoDir = path.join(photosDir, companyId.toString(), year.toString(), month);
-
-    if (!fs.existsSync(companyPhotoDir)) {
-      fs.mkdirSync(companyPhotoDir, { recursive: true });
-    }
-
     // Nombre: photo_YYYYMMDD_timestamp_original.ext
     const timestamp = Date.now();
     const ext = path.extname(req.file.originalname);
     const dateStr = photo_date.replace(/-/g, '');
     const filename = `photo_${dateStr}_${timestamp}${ext}`;
-    const filePath = path.join(companyPhotoDir, filename);
 
-    // Guardar archivo en disco
-    fs.writeFileSync(filePath, req.file.buffer);
-
-    // Guardar metadata en BD
-    const photo = await db.savePhoto(
+    // 💾 Guardar directamente como BLOB (sin pasar por filesystem)
+    const photo = await db.savePhotoWithData(
       companyId,
       photo_date,
       filename,
-      filePath.replace(/\\/g, '/'), // Normalizar rutas
+      req.file.buffer,  // Guardar el buffer directamente
       req.user.userId
     );
 
@@ -86,13 +72,24 @@ router.get('/file/:photoId', authMiddleware, async (req, res) => {
   try {
     const { photoId } = req.params;
 
-    const photo = await db.getPhotoById(photoId);
+    const photo = await db.getPhotoByIdWithData(photoId);
     if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
 
+    // Si tiene photo_data (BLOB), enviar desde BD
+    if (photo.photo_data) {
+      console.log(`📥 Descargando foto desde BD (BLOB): ${photo.filename}`);
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Content-Disposition', `attachment; filename="${photo.filename}"`);
+      return res.send(photo.photo_data);
+    }
+
+    // Si no tiene BLOB, intentar desde filesystem (legado)
     if (!fs.existsSync(photo.path)) {
+      console.log(`⚠️  Foto no encontrada en ruta: ${photo.path}`);
       return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
     }
 
+    console.log(`📥 Descargando foto desde disco: ${photo.filename}`);
     return res.sendFile(photo.path);
   } catch (err) {
     console.error('Error descargando foto:', err);

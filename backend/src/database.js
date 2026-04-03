@@ -264,6 +264,31 @@ async function saveFileWithCompany(companyId, createdBy, name, type, filePath) {
   }
 }
 
+// ✨ NUEVA FUNCIÓN: Guardar con contenido del archivo (BLOB)
+async function saveFileWithCompanyAndData(companyId, createdBy, name, type, fileBuffer) {
+  try {
+    const query = 'INSERT INTO files (company_id, created_by, name, type, file_data, path) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, type, created_at';
+    // Guardar el buffer como BLOB + una nota que dice dónde está
+    const result = await pool.query(query, [companyId, createdBy, name, type, fileBuffer, 'stored_in_database']);
+    return result.rows[0];
+  } catch (err) {
+    console.error('Error guardando archivo con datos:', err);
+    throw err;
+  }
+}
+
+// Obtener archivo por ID (incluyendo contenido si existe)
+async function getFileByIdWithData(id) {
+  try {
+    const query = 'SELECT id, name, type, created_at, file_data, path FROM files WHERE id = $1 AND deleted_at IS NULL';
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  } catch (err) {
+    console.error('Error obteniendo archivo:', err);
+    throw err;
+  }
+}
+
 async function getFilesByCompany(companyId) {
   try {
     const query = 'SELECT id, name, type, created_at, path FROM files WHERE company_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC';
@@ -325,6 +350,22 @@ async function savePhoto(companyId, photoDate, filename, filePath, uploadedBy) {
   }
 }
 
+// ✨ NUEVA FUNCIÓN: Guardar foto con contenido (BLOB)
+async function savePhotoWithData(companyId, photoDate, filename, photoBuffer, uploadedBy) {
+  try {
+    const query = `
+      INSERT INTO photos (company_id, photo_date, filename, photo_data, path, uploaded_by)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, company_id, photo_date, filename, created_at
+    `;
+    const result = await pool.query(query, [companyId, photoDate, filename, photoBuffer, 'stored_in_database', uploadedBy]);
+    return result.rows[0];
+  } catch (err) {
+    console.error('Error guardando foto con datos:', err);
+    throw err;
+  }
+}
+
 async function getPhotosByMonthAndCompany(companyId, year, month) {
   try {
     // Ordenar por photo_date (para que salgan en orden de fecha) y luego por created_at (para mantener orden de subida dentro del mismo día)
@@ -349,6 +390,18 @@ async function getPhotosByMonthAndCompany(companyId, year, month) {
 async function getPhotoById(photoId) {
   try {
     const query = 'SELECT * FROM photos WHERE id = $1 AND is_deleted = false';
+    const result = await pool.query(query, [photoId]);
+    return result.rows[0];
+  } catch (err) {
+    console.error('Error obteniendo foto:', err);
+    throw err;
+  }
+}
+
+// Obtener foto incluyendo contenido si existe
+async function getPhotoByIdWithData(photoId) {
+  try {
+    const query = 'SELECT id, company_id, photo_date, filename, photo_data, path, uploaded_by FROM photos WHERE id = $1 AND is_deleted = false';
     const result = await pool.query(query, [photoId]);
     return result.rows[0];
   } catch (err) {
@@ -429,8 +482,10 @@ module.exports = {
   createCompany, getCompaniesByUserId, getAllCompanies, deleteCompany, getCompanyMembers, addUserToCompany, removeUserFromCompany,
   // Archivos mejorados
   saveFileWithCompany, getFilesByCompany, getFilesByCompanyAndType, getFileById, deleteFileById,
+  // Archivos con BLOB (nuevo)
+  saveFileWithCompanyAndData, getFileByIdWithData,
   // Fotos para reportes
-  savePhoto, getPhotosByMonthAndCompany, getPhotoById, markPhotoAsDeleted, getPhotosByDate,
+  savePhoto, savePhotoWithData, getPhotosByMonthAndCompany, getPhotoById, getPhotoByIdWithData, markPhotoAsDeleted, getPhotosByDate,
   // Config
   getCompanyConfig, saveCompanyConfig
 };
