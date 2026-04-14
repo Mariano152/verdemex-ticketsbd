@@ -66,7 +66,39 @@ router.post('/', authMiddleware, uploadPhoto.single('photo'), async (req, res) =
 });
 
 // ============================================
-// �️ DESCARGAR FOTO (ruta específica - debe ir ANTES de /:year/:month)
+// VER FOTO (mostrar en navegador - ruta específica - debe ir ANTES de /:year/:month)
+// ============================================
+router.get('/view/:photoId', authMiddleware, async (req, res) => {
+  try {
+    const { photoId } = req.params;
+
+    const photo = await db.getPhotoByIdWithData(photoId);
+    if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
+
+    // Si tiene photo_data (BLOB), enviar desde BD
+    if (photo.photo_data) {
+      console.log(`Mostrando foto desde BD (BLOB): ${photo.filename}`);
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Content-Disposition', `inline; filename="${photo.filename}"`);
+      return res.send(photo.photo_data);
+    }
+
+    // Si no tiene BLOB, intentar desde filesystem (legado)
+    if (!fs.existsSync(photo.path)) {
+      console.log(`Foto no encontrada en ruta: ${photo.path}`);
+      return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
+    }
+
+    console.log(`Mostrando foto desde disco: ${photo.filename}`);
+    return res.sendFile(photo.path);
+  } catch (err) {
+    console.error('Error mostrando foto:', err);
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// ============================================
+// DESCARGAR FOTO (ruta específica - debe ir ANTES de /:year/:month)
 // ============================================
 router.get('/file/:photoId', authMiddleware, async (req, res) => {
   try {
@@ -77,7 +109,7 @@ router.get('/file/:photoId', authMiddleware, async (req, res) => {
 
     // Si tiene photo_data (BLOB), enviar desde BD
     if (photo.photo_data) {
-      console.log(`📥 Descargando foto desde BD (BLOB): ${photo.filename}`);
+      console.log(`Descargando foto desde BD (BLOB): ${photo.filename}`);
       res.setHeader('Content-Type', 'image/jpeg');
       res.setHeader('Content-Disposition', `attachment; filename="${photo.filename}"`);
       return res.send(photo.photo_data);
@@ -85,11 +117,11 @@ router.get('/file/:photoId', authMiddleware, async (req, res) => {
 
     // Si no tiene BLOB, intentar desde filesystem (legado)
     if (!fs.existsSync(photo.path)) {
-      console.log(`⚠️  Foto no encontrada en ruta: ${photo.path}`);
+      console.log(`Foto no encontrada en ruta: ${photo.path}`);
       return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
     }
 
-    console.log(`📥 Descargando foto desde disco: ${photo.filename}`);
+    console.log(`Descargando foto desde disco: ${photo.filename}`);
     return res.sendFile(photo.path);
   } catch (err) {
     console.error('Error descargando foto:', err);
@@ -98,7 +130,7 @@ router.get('/file/:photoId', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// 📄 GENERAR PDF DEL REPORTE MENSUAL (ruta específica - debe ir ANTES de /:year/:month)
+// GENERAR PDF DEL REPORTE MENSUAL (ruta específica - debe ir ANTES de /:year/:month)
 // ============================================
 router.get('/report/:year/:month', authMiddleware, async (req, res) => {
   try {
@@ -233,7 +265,7 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// 📷 OBTENER FOTOS POR MES (ruta genérica - debe ir DESPUÉS de las específicas)
+// OBTENER FOTOS POR MES (ruta genérica - debe ir DESPUÉS de las específicas)
 // ============================================
 router.get('/:year/:month', authMiddleware, async (req, res) => {
   try {
@@ -244,7 +276,9 @@ router.get('/:year/:month', authMiddleware, async (req, res) => {
     // Convertir rutas a URLs relativas para el frontend
     const photosWithUrls = photos.map(p => ({
       ...p,
-      url: `/api/companies/${companyId}/photos/file/${p.id}`
+      viewUrl: `/api/companies/${companyId}/photos/view/${p.id}`,
+      downloadUrl: `/api/companies/${companyId}/photos/file/${p.id}`,
+      url: `/api/companies/${companyId}/photos/file/${p.id}` // Mantener para compatibilidad
     }));
 
     return res.json({ ok: true, photos: photosWithUrls });
@@ -286,3 +320,4 @@ router.delete('/:photoId', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+

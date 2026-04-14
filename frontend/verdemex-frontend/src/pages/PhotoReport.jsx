@@ -314,9 +314,31 @@ export default function PhotoReport({ companyId }) {
                     <div 
                       key={photo.id} 
                       className="photo-card"
-                      onClick={() => downloadPhoto(photo.url, photo.filename)}
-                      title="Haz clic para descargar la foto"
+                      title="Foto del reporte"
                     >
+                      {/* Imagen de la foto */}
+                      <img 
+                        src={photo.viewUrl} 
+                        alt={`Foto del ${formatDateDMY(date)}`}
+                        className="photo-image"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      
+                      {/* Botón de descarga */}
+                      <button
+                        className="btn-download-photo"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadPhoto(photo.downloadUrl, photo.filename);
+                        }}
+                        title="Descargar esta foto"
+                      >
+                        📥
+                      </button>
+                      
+                      {/* Botón de eliminar */}
                       <button
                         className="btn-delete-photo"
                         onClick={(e) => {
@@ -327,6 +349,7 @@ export default function PhotoReport({ companyId }) {
                       >
                         ✕
                       </button>
+                      
                       <div className="photo-info">
                         <div className="photo-date">📅 {formatDateDMY(date)}</div>
                       </div>
