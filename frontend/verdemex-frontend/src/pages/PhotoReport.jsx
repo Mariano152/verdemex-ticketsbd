@@ -139,19 +139,75 @@ export default function PhotoReport({ companyId }) {
 
   const handleGeneratePDF = async () => {
     try {
+      console.log(`🔄 [PDF] Iniciando descarga - Company: ${companyId}, ${year}-${String(month).padStart(2, '0')}`);
+      setError('');
+      setSuccess('⏳ Generando PDF...');
+
+      const startTime = Date.now();
+      console.log(`📤 [PDF] GET /api/companies/${companyId}/photos/report/${year}/${String(month).padStart(2, '0')}`);
+
       const response = await api.get(
         `/api/companies/${companyId}/photos/report/${year}/${String(month).padStart(2, '0')}`,
-        { responseType: 'blob' }
+        { responseType: 'blob', timeout: 60000 } // 60 segundos timeout
       );
 
+      const duration = Date.now() - startTime;
+      console.log(`✅ [PDF] Respuesta recibida en ${duration}ms, size: ${response.data.size} bytes`);
+
+      if (!response.data || response.data.size === 0) {
+        console.error('❌ [PDF] PDF vacío recibido');
+        setError('Error: PDF vacío generado');
+        return;
+      }
+
+      console.log(`📥 [PDF] Creando objeto URL...`);
       const url = window.URL.createObjectURL(response.data);
+      
+      console.log(`📎 [PDF] Creando link de descarga...`);
       const link = document.createElement('a');
       link.href = url;
       link.download = `reporte-fotos-${year}-${String(month).padStart(2, '0')}.pdf`;
+      document.body.appendChild(link);
+      
+      console.log(`⬇️  [PDF] Iniciando descarga...`);
       link.click();
+      
+      console.log(`🧹 [PDF] Limpiando recursos...`);
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+
+      console.log(`✅ [PDF] Descarga completada exitosamente`);
+      setSuccess('✅ PDF descargado correctamente');
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Error al generar PDF: ' + (err.response?.data?.error || err.message));
+      console.error('❌ [PDF] ERROR:', {
+        name: err.name,
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        errorData: err.response?.data,
+        url: err.config?.url,
+        timeout: err.code === 'ECONNABORTED' ? 'SÍ - TIMEOUT' : 'NO',
+        fullError: err
+      });
+
+      let errorMsg = 'Error al generar PDF: ';
+      if (err.code === 'ECONNABORTED') {
+        errorMsg += 'Timeout - la solicitud tardó demasiado (>60s)';
+      } else if (err.response?.status === 401) {
+        errorMsg += 'No autorizado - sesión expirada';
+      } else if (err.response?.status === 404) {
+        errorMsg += 'No hay fotos para este mes';
+      } else if (err.response?.status === 500) {
+        errorMsg += 'Error en servidor: ' + (err.response?.data?.error || 'desconocido');
+      } else if (err.message === 'Network Error') {
+        errorMsg += 'Error de red - verifica conexión';
+      } else {
+        errorMsg += err.response?.data?.error || err.message;
+      }
+
+      setError(errorMsg);
+      console.error('📋 [PDF] Mensaje mostrado:', errorMsg);
     }
   };
 

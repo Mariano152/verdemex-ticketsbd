@@ -371,7 +371,7 @@ async function getPhotosByMonthAndCompany(companyId, year, month) {
     // Ordenar por photo_date (para que salgan en orden de fecha) y luego por created_at (para mantener orden de subida dentro del mismo día)
     // Convertir photo_date a formato YYYY-MM-DD como string
     const query = `
-      SELECT id, company_id, TO_CHAR(photo_date, 'YYYY-MM-DD') as photo_date, filename, path, uploaded_by, created_at
+      SELECT id, company_id, TO_CHAR(photo_date, 'YYYY-MM-DD') as photo_date, filename, path, photo_data, uploaded_by, created_at
       FROM photos
       WHERE company_id = $1
         AND EXTRACT(YEAR FROM photo_date) = $2

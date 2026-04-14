@@ -29,11 +29,7 @@ router.post('/', authMiddleware, uploadPhoto.single('photo'), async (req, res) =
 
     if (!req.file) return res.status(400).json({ error: 'No se subió foto' });
     if (!photo_date) return res.status(400).json({ error: 'Falta la fecha de la foto' });
-
-    // Validar que sea imagen
-    if (!req.file.mimetype.startsWith('image/')) {
-      return res.status(400).json({ error: 'Solo se aceptan imágenes' });
-    }
+    if (!req.file.mimetype.startsWith('image/')) return res.status(400).json({ error: 'Solo se aceptan imágenes' });
 
     // Nombre: photo_YYYYMMDD_timestamp_original.ext
     const timestamp = Date.now();
@@ -49,6 +45,14 @@ router.post('/', authMiddleware, uploadPhoto.single('photo'), async (req, res) =
       req.file.buffer,  // Guardar el buffer directamente
       req.user.userId
     );
+
+    console.log(`✅ [UPLOAD] Foto guardada exitosamente:`, {
+      photoId: photo.id,
+      filename: photo.filename,
+      date: photo.photo_date,
+      bufferSize: req.file.buffer.length,
+      company: companyId
+    });
 
     return res.json({
       ok: true,
@@ -66,33 +70,28 @@ router.post('/', authMiddleware, uploadPhoto.single('photo'), async (req, res) =
 });
 
 // ============================================
-// VER FOTO (mostrar en navegador - ruta específica - debe ir ANTES de /:year/:month)
+// VER FOTO (mostrar en navegador)
 // ============================================
 router.get('/view/:photoId', authMiddleware, async (req, res) => {
   try {
     const { photoId } = req.params;
-
     const photo = await db.getPhotoByIdWithData(photoId);
     if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
 
-    // Si tiene photo_data (BLOB), enviar desde BD
     if (photo.photo_data) {
-      console.log(`Mostrando foto desde BD (BLOB): ${photo.filename}`);
       res.setHeader('Content-Type', 'image/jpeg');
       res.setHeader('Content-Disposition', `inline; filename="${photo.filename}"`);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
       return res.send(photo.photo_data);
     }
 
-    // Si no tiene BLOB, intentar desde filesystem (legado)
     if (!fs.existsSync(photo.path)) {
-      console.log(`Foto no encontrada en ruta: ${photo.path}`);
-      return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
+      return res.status(404).json({ error: 'Archivo no encontrado' });
     }
 
-    console.log(`Mostrando foto desde disco: ${photo.filename}`);
     return res.sendFile(photo.path);
   } catch (err) {
-    console.error('Error mostrando foto:', err);
+    console.error('Error en /view:', err.message);
     return res.status(400).json({ error: err.message });
   }
 });
@@ -135,32 +134,30 @@ router.get('/file/:photoId', authMiddleware, async (req, res) => {
 router.get('/report/:year/:month', authMiddleware, async (req, res) => {
   try {
     const { companyId, year, month } = req.params;
+    console.log(`\n📄 [PDF] Iniciando generación - Company: ${companyId}, ${year}-${String(month).padStart(2, '0')}`);
+    const startTime = Date.now();
 
     const photos = await db.getPhotosByMonthAndCompany(companyId, parseInt(year), parseInt(month));
+    console.log(`✅ [PDF] Fotos cargadas: ${photos.length}`);
 
     if (photos.length === 0) {
+      console.log(`⚠️  [PDF] Sin fotos para este período`);
       return res.status(404).json({ error: 'No hay fotos para este mes' });
     }
 
-    // Limpiar las fechas de las fotos para asegurar que sean strings YYYY-MM-DD
+    // Limpiar las fechas
     photos.forEach(photo => {
       let dateStr = String(photo.photo_date).trim();
-      // Extraer solo YYYY-MM-DD usando regex
       const match = dateStr.match(/^(\d{4}-\d{2}-\d{2})/);
-      if (match) {
-        photo.photo_date = match[1];
-      } else if (dateStr.includes('T')) {
-        photo.photo_date = dateStr.split('T')[0];
-      }
+      if (match) photo.photo_date = match[1];
+      else if (dateStr.includes('T')) photo.photo_date = dateStr.split('T')[0];
     });
 
-    // Crear PDF
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
     const pdfName = `reporte_fotograafico_${year}_${String(month).padStart(2, '0')}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${pdfName}"`);
-
     doc.pipe(res);
 
     // Encabezado
@@ -172,20 +169,12 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
     doc.fontSize(14).font('Helvetica').text(`${monthName} ${year}`, { align: 'center' });
     doc.moveDown();
 
-    // Agrupar fotos por fecha (limpiando la clave)
+    // Agrupar fotos por fecha
     const photosByDate = {};
     photos.forEach(photo => {
-      let dateStr = photo.photo_date;
-      
-      // Limpiar la fecha para usarla como clave
-      dateStr = String(dateStr).trim();
-      if (dateStr.includes('T')) {
-        dateStr = dateStr.split('T')[0];
-      }
-      
-      if (!photosByDate[dateStr]) {
-        photosByDate[dateStr] = [];
-      }
+      let dateStr = String(photo.photo_date).trim();
+      if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+      if (!photosByDate[dateStr]) photosByDate[dateStr] = [];
       photosByDate[dateStr].push(photo);
     });
 
@@ -193,62 +182,43 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
     const photoPerRow = 4;
     let currentY = doc.y;
     let photosInRow = 0;
+    let imagesInserted = 0;
 
     sortedDates.forEach((dateStr) => {
       const photosForDate = photosByDate[dateStr];
 
       photosForDate.forEach((photo) => {
-        // Obtener la fecha limpia directamente del objeto foto
         let cleanDate = photo.photo_date;
-        if (typeof cleanDate === 'string') {
-          // Si es string ISO, extraer YYYY-MM-DD
-          if (cleanDate.includes('T')) {
-            cleanDate = cleanDate.split('T')[0];
-          }
-        }
-        
-        // Convertir YYYY-MM-DD a DD-MM-YYYY
+        if (typeof cleanDate === 'string' && cleanDate.includes('T')) cleanDate = cleanDate.split('T')[0];
         if (typeof cleanDate === 'string' && cleanDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
           const [year, month, day] = cleanDate.split('-');
           cleanDate = `${day}-${month}-${year}`;
         }
 
-        // Nueva fila
-        if (photosInRow === 0) {
-          currentY = doc.y;
-        }
+        if (photosInRow === 0) currentY = doc.y;
 
-        // Calcular posición
         const photoWidth = 100;
         const photoHeight = 100;
         const spacing = 20;
         const startX = 40 + (photosInRow * (photoWidth + spacing));
 
-        // Cargar imagen
         try {
-          if (fs.existsSync(photo.path)) {
-            doc.image(photo.path, startX, currentY, {
-              width: photoWidth,
-              height: photoHeight,
-              fit: [photoWidth, photoHeight]
-            });
+          if (photo.photo_data) {
+            doc.image(photo.photo_data, startX, currentY, { width: photoWidth, height: photoHeight, fit: [photoWidth, photoHeight] });
+            imagesInserted++;
+          } else if (photo.path && fs.existsSync(photo.path)) {
+            doc.image(photo.path, startX, currentY, { width: photoWidth, height: photoHeight, fit: [photoWidth, photoHeight] });
+            imagesInserted++;
+          } else {
+            doc.text('[No disponible]', startX, currentY, { width: photoWidth, align: 'center' });
           }
         } catch (e) {
-          doc.text('[Imagen no disponible]', startX, currentY, {
-            width: photoWidth,
-            align: 'center'
-          });
+          doc.text('[Error]', startX, currentY, { width: photoWidth, align: 'center' });
         }
 
-        // Mostrar SOLO la fecha DD-MM-YYYY debajo de la foto
-        doc.fontSize(9).text(cleanDate, startX, currentY + photoHeight + 5, {
-          width: photoWidth,
-          align: 'center'
-        });
-
+        doc.fontSize(9).text(cleanDate, startX, currentY + photoHeight + 5, { width: photoWidth, align: 'center' });
         photosInRow++;
 
-        // Salto de fila después de 4 fotos
         if (photosInRow === photoPerRow) {
           doc.moveDown(7);
           currentY = doc.y;
@@ -257,33 +227,34 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
       });
     });
 
+    console.log(`✅ Reporte PDF generado: ${imagesInserted}/${photos.length} imágenes`);
+    const duration = Date.now() - startTime;
+    console.log(`⏱️  [PDF] Tiempo total: ${duration}ms\n`);
     doc.end();
   } catch (err) {
-    console.error('Error generando PDF:', err);
+    console.error('Error en /report:', err.message);
     return res.status(400).json({ error: err.message });
   }
 });
 
 // ============================================
-// OBTENER FOTOS POR MES (ruta genérica - debe ir DESPUÉS de las específicas)
+// OBTENER FOTOS POR MES
 // ============================================
 router.get('/:year/:month', authMiddleware, async (req, res) => {
   try {
     const { companyId, year, month } = req.params;
-
     const photos = await db.getPhotosByMonthAndCompany(companyId, parseInt(year), parseInt(month));
 
-    // Convertir rutas a URLs relativas para el frontend
     const photosWithUrls = photos.map(p => ({
       ...p,
       viewUrl: `/api/companies/${companyId}/photos/view/${p.id}`,
       downloadUrl: `/api/companies/${companyId}/photos/file/${p.id}`,
-      url: `/api/companies/${companyId}/photos/file/${p.id}` // Mantener para compatibilidad
+      url: `/api/companies/${companyId}/photos/file/${p.id}`
     }));
 
     return res.json({ ok: true, photos: photosWithUrls });
   } catch (err) {
-    console.error('Error obteniendo fotos:', err);
+    console.error('Error en /:year/:month:', err.message);
     return res.status(400).json({ error: err.message });
   }
 });
