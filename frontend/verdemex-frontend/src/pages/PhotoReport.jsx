@@ -62,63 +62,80 @@ export default function PhotoReport({ companyId }) {
   };
 
   const handlePhotoUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
-      setError('❌ Solo se permiten imágenes (JPG, PNG, GIF)');
+    const validFiles = [];
+    const errors = [];
+
+    // Validar todos los archivos
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+        errors.push(`❌ ${file.name}: tipo no permitido`);
+        continue;
+      }
+
+      const [photoYear, photoMonth] = selectedDate.split('-').map(Number);
+      if (photoYear !== year || photoMonth !== month) {
+        errors.push(`❌ ${file.name}: fecha fuera del rango ${monthNames[month - 1]} ${year}`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      setError(errors.join('\n'));
       return;
     }
 
-    // Validar que la fecha esté en el mes/año seleccionado
-    const [photoYear, photoMonth] = selectedDate.split('-').map(Number);
-    if (photoYear !== year || photoMonth !== month) {
-      setError(`❌ La fecha debe estar en ${monthNames[month - 1]} de ${year}`);
-      return;
+    if (errors.length > 0) {
+      setError(errors.join('\n'));
     }
-
-    // Intentar mostrar preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPreviewImage({
-        src: e.target.result,
-        hasError: false
-      });
-    };
-    reader.readAsDataURL(file);
 
     setUploading(true);
-    setError('');
     setSuccess('');
+    let uploaded = 0;
+    let failed = 0;
+    const uploadErrors = [];
 
     try {
-      const formData = new FormData();
-      formData.append('photo', file);
-      formData.append('photo_date', selectedDate);
+      for (const file of validFiles) {
+        try {
+          const formData = new FormData();
+          formData.append('photo', file);
+          formData.append('photo_date', selectedDate);
 
-      await api.post(
-        `/api/companies/${companyId}/photos`,
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          await api.post(
+            `/api/companies/${companyId}/photos`,
+            formData,
+            {
+              headers: { 'Content-Type': 'multipart/form-data' }
+            }
+          );
+
+          uploaded++;
+          setSuccess(`⏳ Subidas: ${uploaded}/${validFiles.length}...`);
+        } catch (err) {
+          failed++;
+          uploadErrors.push(`❌ ${file.name}: ${err.response?.data?.error || err.message}`);
         }
-      );
+      }
 
-      setSuccess(`✅ Foto del ${formatDateDMY(selectedDate)} subida correctamente`);
       setPreviewImage(null);
       await loadPhotos();
       e.target.value = '';
 
-      setTimeout(() => setSuccess(''), 3000);
+      if (failed === 0) {
+        setSuccess(`✅ ${uploaded} foto(s) subida(s) correctamente`);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(`⚠️  ${uploaded} exitosas, ${failed} fallidas:\n${uploadErrors.join('\n')}`);
+      }
     } catch (err) {
-      setError('❌ Error al subir foto: ' + (err.response?.data?.error || err.message));
-      // Mostrar como card si hubo error
-      setPreviewImage({
-        src: null,
-        hasError: true,
-        date: selectedDate,
-        filename: file.name
-      });
+      setError('❌ Error al subir fotos: ' + err.message);
     } finally {
       setUploading(false);
     }
@@ -310,13 +327,14 @@ export default function PhotoReport({ companyId }) {
           </div>
 
           <div className="upload-group">
-            <label htmlFor="photo-input">Seleccionar archivo (JPG, PNG, GIF):</label>
+            <label htmlFor="photo-input">Seleccionar archivo(s) (JPG, PNG, GIF) - Puedes seleccionar varias:</label>
             <input
               id="photo-input"
               type="file"
               accept="image/jpeg,image/png,image/gif"
               onChange={handlePhotoUpload}
               disabled={uploading}
+              multiple
             />
           </div>
         </div>
