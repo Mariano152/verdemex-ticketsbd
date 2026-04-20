@@ -153,23 +153,124 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
       else if (dateStr.includes('T')) photo.photo_date = dateStr.split('T')[0];
     });
 
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 30 });
     const pdfName = `reporte_fotograafico_${year}_${String(month).padStart(2, '0')}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${pdfName}"`);
     doc.pipe(res);
 
-    // Encabezado
+    // ═══ CONFIGURACIÓN DE PÁGINA ═══
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const margin = 30;
+    
+    // ═══ PLANTILLA DE FONDO (opcional)
+    const templatePath = path.join(__dirname, '..', 'output', 'template.png');
+    const hasTemplate = fs.existsSync(templatePath);
+    
+    console.log(`📋 [TEMPLATE] Buscando en: ${templatePath}`);
+    console.log(`📋 [TEMPLATE] __dirname: ${__dirname}`);
+    console.log(`📋 [TEMPLATE] ¿Plantilla existe? ${hasTemplate ? '✅ SÍ' : '❌ NO'}`);
+    
+    // Si no existe con .png, intentar con .PNG o .jpg
+    let finalTemplatePath = templatePath;
+    if (!hasTemplate) {
+      const pngUpper = path.join(__dirname, '..', 'output', 'template.PNG');
+      const jpg = path.join(__dirname, '..', 'output', 'template.jpg');
+      const jpgUpper = path.join(__dirname, '..', 'output', 'template.JPG');
+      
+      if (fs.existsSync(pngUpper)) {
+        console.log(`📋 [TEMPLATE] Encontrada con mayúsculas: template.PNG`);
+        finalTemplatePath = pngUpper;
+      } else if (fs.existsSync(jpg)) {
+        console.log(`📋 [TEMPLATE] Encontrada: template.jpg`);
+        finalTemplatePath = jpg;
+      } else if (fs.existsSync(jpgUpper)) {
+        console.log(`📋 [TEMPLATE] Encontrada con mayúsculas: template.JPG`);
+        finalTemplatePath = jpgUpper;
+      } else {
+        console.log(`📋 [TEMPLATE] No encontrada en ningún formato (usaremos fondo blanco)`);
+      }
+    }
+    
+    const hasTemplate2 = fs.existsSync(finalTemplatePath);
+    console.log(`📋 [TEMPLATE] Ruta final: ${finalTemplatePath}`);
+    console.log(`📋 [TEMPLATE] ¿Existe ruta final? ${hasTemplate2 ? '✅ SÍ' : '❌ NO'}`);
+    
+    // ═══ CONFIGURACIÓN DE IMÁGENES ═══
+    const photoWidth = 130;    // Ancho de foto
+    const photoHeight = 130;   // Alto de foto
+    const photosPerRow = 3;    // 3 fotos por fila
+    const photosPerColumn = 4; // 4 filas máximo por página
+    const photosPerPage = photosPerRow * photosPerColumn; // 12 fotos por página
+    
+    const spacingX = 20;      // Espacio horizontal entre fotos
+    const spacingY = 30;      // Espacio vertical entre filas (incluye texto de fecha)
+    
     const monthNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const monthName = monthNames[parseInt(month)];
 
-    doc.fontSize(20).font('Helvetica-Bold').text('REPORTE FOTOGRÁFICO', { align: 'center' });
-    doc.fontSize(14).font('Helvetica').text(`${monthName} ${year}`, { align: 'center' });
-    doc.moveDown();
+    // ═══ FUNCIÓN: Agregar encabezado (plantilla)
+    const addPageHeader = () => {
+      console.log(`📋 [HEADER] Agregando encabezado de página...`);
+      
+      // 🎨 Agregar plantilla de fondo si existe (sin mover el cursor)
+      if (hasTemplate2) {
+        try {
+          console.log(`   🎨 Insertando plantilla de fondo desde: ${finalTemplatePath}`);
+          // Guardar posición actual del cursor
+          const currentY = doc.y;
+          
+          // Insertar plantilla en la posición 0,0 de la página
+          doc.image(finalTemplatePath, 0, 0, { 
+            width: pageWidth, 
+            height: pageHeight 
+          });
+          
+          // Restaurar posición del cursor (para que no mueva el texto)
+          doc.y = currentY;
+          
+          console.log(`   ✅ Plantilla de fondo insertada (Y restaurado: ${currentY.toFixed(1)})`);
+        } catch (e) {
+          console.error(`   ⚠️  Error al insertar plantilla: ${e.message}`);
+        }
+      }
+      
+      // Solo agregar texto si NO hay plantilla
+      if (!hasTemplate2) {
+        doc.fontSize(18).font('Helvetica-Bold').text('REPORTE FOTOGRÁFICO', { align: 'center' });
+        doc.fontSize(12).font('Helvetica').text(`${monthName} ${year}`, { align: 'center' });
+        doc.moveDown(0.3);
+        doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
+        doc.moveDown(0.5);
+      }
+      
+      const headerEndY = doc.y;
+      console.log(`✅ [HEADER] Encabezado completo. Y final: ${headerEndY.toFixed(1)}`);
+      return headerEndY;
+    };
 
-    // Agrupar fotos por fecha
+    // ═══ FUNCIÓN: Calcular posición X,Y basado en índice de posición
+    const getPositionForIndex = (indexInPage) => {
+      const row = Math.floor(indexInPage / photosPerRow);
+      const col = indexInPage % photosPerRow;
+      
+      // Calcular X: centrado + columna
+      const totalRowWidth = (photosPerRow * photoWidth) + ((photosPerRow - 1) * spacingX);
+      const contentWidth = pageWidth - (2 * margin);
+      const leftPadding = (contentWidth - totalRowWidth) / 2;
+      const x = margin + leftPadding + (col * (photoWidth + spacingX));
+      
+      // Calcular Y: header + filas
+      const headerY = 110; // Aproximado después del header
+      const y = headerY + (row * (photoHeight + spacingY));
+      
+      return { x: x.toFixed(1), y: y.toFixed(1), row, col };
+    };
+
+    // ═══ AGRUPAR FOTOS POR FECHA
     const photosByDate = {};
     photos.forEach(photo => {
       let dateStr = String(photo.photo_date).trim();
@@ -179,11 +280,18 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
     });
 
     const sortedDates = Object.keys(photosByDate).sort();
-    const photoPerRow = 4;
-    let currentY = doc.y;
-    let photosInRow = 0;
-    let imagesInserted = 0;
+    console.log(`\n📊 [INIT] Fotos agrupadas en ${sortedDates.length} días`);
+    console.log(`📊 [INIT] Posiciones por página: ${photosPerPage} (${photosPerRow}x${photosPerColumn})`);
 
+    // ═══ INICIALIZAR PRIMERA PÁGINA
+    addPageHeader();
+    let imagesInserted = 0;
+    let imagesInPage = 0;
+    let currentPageNumber = 1;
+
+    console.log(`\n🚀 [START] Iniciando colocación de imágenes...`);
+
+    // ═══ PROCESAR CADA FOTO
     sortedDates.forEach((dateStr) => {
       const photosForDate = photosByDate[dateStr];
 
@@ -191,48 +299,88 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
         let cleanDate = photo.photo_date;
         if (typeof cleanDate === 'string' && cleanDate.includes('T')) cleanDate = cleanDate.split('T')[0];
         if (typeof cleanDate === 'string' && cleanDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          const [year, month, day] = cleanDate.split('-');
-          cleanDate = `${day}-${month}-${year}`;
+          const [photoYear, photoMonth, day] = cleanDate.split('-');
+          cleanDate = `${day}-${photoMonth}-${photoYear}`;
         }
 
-        if (photosInRow === 0) currentY = doc.y;
+        // 🔍 CONTADOR: Verificar si página está llena
+        if (imagesInPage >= photosPerPage) {
+          console.log(`\n📄 [PAGE FULL] Página ${currentPageNumber} completa (${imagesInPage}/${photosPerPage}). Creando nueva página...`);
+          doc.addPage();
+          addPageHeader();
+          imagesInPage = 0;
+          currentPageNumber++;
+          console.log(`📄 [NEW PAGE] Página ${currentPageNumber} iniciada\n`);
+        }
 
-        const photoWidth = 100;
-        const photoHeight = 100;
-        const spacing = 20;
-        const startX = 40 + (photosInRow * (photoWidth + spacing));
+        // 📍 OBTENER POSICIÓN PREDEFINIDA
+        const position = getPositionForIndex(imagesInPage);
+        const startX = parseFloat(position.x);
+        const startY = parseFloat(position.y);
 
+        console.log(`📸 [IMG ${imagesInserted + 1}/${photos.length}] Página:${currentPageNumber} Pos:${imagesInPage + 1}/${photosPerPage} | X:${position.x} Y:${position.y} (Fila:${position.row} Col:${position.col}) | Fecha:${cleanDate}`);
+
+        // ✅ INSERTAR IMAGEN EN POSICIÓN FIJA
         try {
           if (photo.photo_data) {
-            doc.image(photo.photo_data, startX, currentY, { width: photoWidth, height: photoHeight, fit: [photoWidth, photoHeight] });
+            doc.image(photo.photo_data, startX, startY, { 
+              width: photoWidth, 
+              height: photoHeight, 
+              fit: [photoWidth, photoHeight] 
+            });
             imagesInserted++;
+            console.log(`   ✅ BLOB insertada exitosamente`);
           } else if (photo.path && fs.existsSync(photo.path)) {
-            doc.image(photo.path, startX, currentY, { width: photoWidth, height: photoHeight, fit: [photoWidth, photoHeight] });
+            doc.image(photo.path, startX, startY, { 
+              width: photoWidth, 
+              height: photoHeight, 
+              fit: [photoWidth, photoHeight] 
+            });
             imagesInserted++;
+            console.log(`   ✅ Archivo insertado exitosamente`);
           } else {
-            doc.text('[No disponible]', startX, currentY, { width: photoWidth, align: 'center' });
+            // Placeholder para imagen no disponible
+            doc.rect(startX, startY, photoWidth, photoHeight).stroke();
+            doc.fontSize(8).text('[No disponible]', startX, startY + (photoHeight / 2) - 5, { 
+              width: photoWidth, 
+              align: 'center' 
+            });
+            console.log(`   ⚠️  Placeholder (no disponible)`);
           }
         } catch (e) {
-          doc.text('[Error]', startX, currentY, { width: photoWidth, align: 'center' });
+          console.error(`   ❌ ERROR: ${e.message}`);
+          // Error placeholder
+          doc.rect(startX, startY, photoWidth, photoHeight).stroke();
+          doc.fontSize(8).text('[Error]', startX, startY + (photoHeight / 2) - 5, { 
+            width: photoWidth, 
+            align: 'center' 
+          });
         }
 
-        doc.fontSize(9).text(cleanDate, startX, currentY + photoHeight + 5, { width: photoWidth, align: 'center' });
-        photosInRow++;
+        // 📅 AGREGAR TEXTO DE FECHA DEBAJO
+        const dateY = startY + photoHeight + 3;
+        doc.fontSize(7).font('Helvetica').text(cleanDate, startX, dateY, { 
+          width: photoWidth, 
+          align: 'center' 
+        });
 
-        if (photosInRow === photoPerRow) {
-          doc.moveDown(7);
-          currentY = doc.y;
-          photosInRow = 0;
-        }
+        // ➕ INCREMENTAR CONTADORES
+        imagesInPage++;
       });
     });
 
-    console.log(`✅ Reporte PDF generado: ${imagesInserted}/${photos.length} imágenes`);
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`✅ [COMPLETE] PDF Generado exitosamente`);
+    console.log(`📊 [STATS] Total imágenes: ${imagesInserted}/${photos.length}`);
+    console.log(`📊 [STATS] Páginas generadas: ${currentPageNumber}`);
+    console.log(`📊 [STATS] Última página: ${imagesInPage}/${photosPerPage} posiciones usadas`);
     const duration = Date.now() - startTime;
-    console.log(`⏱️  [PDF] Tiempo total: ${duration}ms\n`);
+    console.log(`⏱️  [TIME] Tiempo total: ${duration}ms`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    
     doc.end();
   } catch (err) {
-    console.error('Error en /report:', err.message);
+    console.error('❌ [ERROR] Error en /report:', err.message);
     return res.status(400).json({ error: err.message });
   }
 });
