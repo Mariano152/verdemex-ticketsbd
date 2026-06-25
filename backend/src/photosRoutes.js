@@ -199,18 +199,30 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
     console.log(`📋 [TEMPLATE] ¿Existe ruta final? ${hasTemplate2 ? '✅ SÍ' : '❌ NO'}`);
     
     // ═══ CONFIGURACIÓN DE IMÁGENES ═══
-    const photoWidth = 130;    // Ancho de foto
-    const photoHeight = 130;   // Alto de foto
+    const photoWidth = 128;    // Ancho de foto
+    const photoHeight = 128;   // Alto de foto
     const photosPerRow = 3;    // 3 fotos por fila
-    const photosPerColumn = 4; // 4 filas máximo por página
-    const photosPerPage = photosPerRow * photosPerColumn; // 12 fotos por página
+    const photosPerColumn = 3; // 3 filas máximo por página
+    const photosPerPage = photosPerRow * photosPerColumn; // 9 fotos por página
     
-    const spacingX = 20;      // Espacio horizontal entre fotos
-    const spacingY = 30;      // Espacio vertical entre filas (incluye texto de fecha)
+    const spacingX = 22;      // Espacio horizontal entre fotos
+    const rowGap = 24;        // Espacio vertical entre filas
+    const dateOffsetY = 6;    // Separación entre foto y fecha
+    const dateLabelHeight = 12;
+    let gridStartY = 300;
     
     const monthNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    const monthName = monthNames[parseInt(month)];
+    const reportYear = parseInt(year, 10);
+    const reportMonth = parseInt(month, 10);
+    const monthName = monthNames[reportMonth];
+    const lastDayOfMonth = new Date(reportYear, reportMonth, 0).getDate();
+    const reportHeaderLines = [
+      'Licitacion LCCC-GDL-031-2026',
+      'No. Orden de compra OC/00223/2026,',
+      'Servicio de recoleccion de organicos en Mercado de Abastos',
+      `Fecha del 01 al ${String(lastDayOfMonth).padStart(2, '0')} de ${monthName} ${reportYear}.`
+    ];
 
     // ═══ FUNCIÓN: Agregar encabezado (plantilla)
     const addPageHeader = () => {
@@ -238,16 +250,27 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
         }
       }
       
-      // Solo agregar texto si NO hay plantilla
-      if (!hasTemplate2) {
-        doc.fontSize(18).font('Helvetica-Bold').text('REPORTE FOTOGRÁFICO', { align: 'center' });
-        doc.fontSize(12).font('Helvetica').text(`${monthName} ${year}`, { align: 'center' });
-        doc.moveDown(0.3);
-        doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
-        doc.moveDown(0.5);
-      }
-      
-      const headerEndY = doc.y;
+      const headerTextX = margin + 70;
+      const headerTextY = hasTemplate2 ? 180 : 80;
+      const headerTextWidth = pageWidth - (headerTextX * 2);
+      const headerText = reportHeaderLines.join('\n');
+
+      doc.font('Helvetica-Bold').fontSize(12);
+      const headerTextHeight = doc.heightOfString(headerText, {
+        width: headerTextWidth,
+        align: 'center',
+        lineGap: 2
+      });
+
+      doc.fillColor('#1F2937');
+      doc.font('Helvetica-Bold').fontSize(12).text(headerText, headerTextX, headerTextY, {
+        width: headerTextWidth,
+        align: 'center',
+        lineGap: 2
+      });
+
+      gridStartY = headerTextY + headerTextHeight + 34;
+      const headerEndY = gridStartY;
       console.log(`✅ [HEADER] Encabezado completo. Y final: ${headerEndY.toFixed(1)}`);
       return headerEndY;
     };
@@ -263,9 +286,8 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
       const leftPadding = (contentWidth - totalRowWidth) / 2;
       const x = margin + leftPadding + (col * (photoWidth + spacingX));
       
-      // Calcular Y: header + filas
-      const headerY = 110; // Aproximado después del header
-      const y = headerY + (row * (photoHeight + spacingY));
+      // Calcular Y: header dinámico + filas
+      const y = gridStartY + (row * (photoHeight + rowGap + dateLabelHeight));
       
       return { x: x.toFixed(1), y: y.toFixed(1), row, col };
     };
@@ -358,7 +380,7 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
         }
 
         // 📅 AGREGAR TEXTO DE FECHA DEBAJO
-        const dateY = startY + photoHeight + 3;
+        const dateY = startY + photoHeight + dateOffsetY;
         doc.fontSize(7).font('Helvetica').text(cleanDate, startX, dateY, { 
           width: photoWidth, 
           align: 'center' 

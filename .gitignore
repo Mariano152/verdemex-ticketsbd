@@ -32,4 +32,8 @@ dist-ssr/
 
 # App generated files
 backend/output/
+!backend/output/template.png
+!backend/output/template.PNG
+!backend/output/template.jpg
+!backend/output/template.JPG
 backend/data/config.json
