@@ -199,15 +199,15 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
     console.log(`📋 [TEMPLATE] ¿Existe ruta final? ${hasTemplate2 ? '✅ SÍ' : '❌ NO'}`);
     
     // ═══ CONFIGURACIÓN DE IMÁGENES ═══
-    const photoWidth = 128;    // Ancho de foto
-    const photoHeight = 128;   // Alto de foto
+    const photoWidth = 136;    // Ancho de foto
+    const photoHeight = 136;   // Alto de foto
     const photosPerRow = 3;    // 3 fotos por fila
     const photosPerColumn = 3; // 3 filas máximo por página
     const photosPerPage = photosPerRow * photosPerColumn; // 9 fotos por página
     
-    const spacingX = 22;      // Espacio horizontal entre fotos
-    const rowGap = 24;        // Espacio vertical entre filas
-    const dateOffsetY = 6;    // Separación entre foto y fecha
+    const spacingX = 16;      // Espacio horizontal entre fotos
+    const rowGap = 20;        // Espacio vertical entre filas
+    const dateOffsetY = 4;    // Separación entre foto y fecha
     const dateLabelHeight = 12;
     let gridStartY = 300;
     
@@ -251,7 +251,7 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
       }
       
       const headerTextX = margin + 70;
-      const headerTextY = hasTemplate2 ? 180 : 80;
+      const headerTextY = hasTemplate2 ? 112 : 62;
       const headerTextWidth = pageWidth - (headerTextX * 2);
       const headerText = reportHeaderLines.join('\n');
 
@@ -269,7 +269,7 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
         lineGap: 2
       });
 
-      gridStartY = headerTextY + headerTextHeight + 34;
+      gridStartY = headerTextY + headerTextHeight + 12;
       const headerEndY = gridStartY;
       console.log(`✅ [HEADER] Encabezado completo. Y final: ${headerEndY.toFixed(1)}`);
       return headerEndY;
