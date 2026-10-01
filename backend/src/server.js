@@ -78,6 +78,29 @@ function getOutputFilename(excelFilename, extension, uniqueId) {
   return `${ticketName}_${uniqueId}.${extension}`;
 }
 
+// Mantiene activa la conexión con Supabase mediante un monitor externo.
+// Configura KEEP_ALIVE_SECRET en producción y envíalo como Bearer token.
+app.get("/api/keep-alive", async (req, res) => {
+  const keepAliveSecret = process.env.KEEP_ALIVE_SECRET;
+  const authorization = req.get("authorization");
+
+  if (!keepAliveSecret) {
+    return res.status(503).json({ error: "Keep-alive no configurado" });
+  }
+
+  if (authorization !== `Bearer ${keepAliveSecret}`) {
+    return res.status(401).json({ error: "No autorizado" });
+  }
+
+  try {
+    await db.pool.query("SELECT 1");
+    return res.json({ ok: true, database: "active" });
+  } catch (err) {
+    console.error("❌ Error en keep-alive:", err.message);
+    return res.status(503).json({ ok: false, database: "unavailable" });
+  }
+});
+
 // ============================================
 // 🔐 RUTAS DE AUTENTICACIÓN (SIN PROTEGER)
 // ============================================
