@@ -137,7 +137,14 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
     console.log(`\n📄 [PDF] Iniciando generación - Company: ${companyId}, ${year}-${String(month).padStart(2, '0')}`);
     const startTime = Date.now();
 
-    const photos = await db.getPhotosByMonthAndCompany(companyId, parseInt(year), parseInt(month));
+    const [company, photos] = await Promise.all([
+      db.getCompanyById(companyId),
+      db.getPhotosByMonthAndCompany(companyId, parseInt(year), parseInt(month))
+    ]);
+
+    if (!company) {
+      return res.status(404).json({ error: 'Empresa no encontrada' });
+    }
     console.log(`✅ [PDF] Fotos cargadas: ${photos.length}`);
 
     if (photos.length === 0) {
@@ -220,7 +227,7 @@ router.get('/report/:year/:month', authMiddleware, async (req, res) => {
     const reportHeaderLines = [
       'Licitacion LCCC-GDL-031-2026',
       'No. Orden de compra OC/00223/2026,',
-      'Servicio de recoleccion de organicos en Mercado de Abastos',
+      `Servicio de recoleccion de organicos en ${company.name}`,
       `Fecha del 01 al ${String(lastDayOfMonth).padStart(2, '0')} de ${monthName} ${reportYear}.`
     ];
 

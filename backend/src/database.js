@@ -201,6 +201,17 @@ async function getAllCompanies() {
   }
 }
 
+async function getCompanyById(companyId) {
+  try {
+    const query = 'SELECT id, name, created_by, created_at FROM companies WHERE id = $1 AND deleted_at IS NULL';
+    const result = await pool.query(query, [companyId]);
+    return result.rows[0];
+  } catch (err) {
+    console.error('Error obteniendo empresa:', err);
+    throw err;
+  }
+}
+
 async function deleteCompany(companyId) {
   try {
     const query = 'UPDATE companies SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING id, name';
@@ -479,7 +490,7 @@ module.exports = {
   // Usuarios
   createUser, getUserByUsername, getUserById, updateUserPassword, getAllUsers, updateUserRole, deleteUser,
   // Empresas
-  createCompany, getCompaniesByUserId, getAllCompanies, deleteCompany, getCompanyMembers, addUserToCompany, removeUserFromCompany,
+  createCompany, getCompaniesByUserId, getAllCompanies, getCompanyById, deleteCompany, getCompanyMembers, addUserToCompany, removeUserFromCompany,
   // Archivos mejorados
   saveFileWithCompany, getFilesByCompany, getFilesByCompanyAndType, getFileById, deleteFileById,
   // Archivos con BLOB (nuevo)
