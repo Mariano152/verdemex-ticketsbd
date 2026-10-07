@@ -7,7 +7,7 @@ const { differenceInDays } = require("date-fns");
 
 /**
  * Genera filas de tickets según:
- * - rango fechas (saltando domingos si aplica)
+ * - rango de fechas (incluye domingos y excluye días festivos)
  * - conductores activos
  * - ticketsPorDia por conductor (soporta decimales)
  * - horarios rotativos (si ticketsPorDia > horarios.length, repite)
@@ -42,8 +42,7 @@ async function generateExcel({
     throw new Error("No hay conductores activos. Activa o agrega al menos uno.");
   }
 
-  const skipSundays = Boolean(config?.rules?.skipSundays ?? true);
-  const dates = buildDateList(startDateISO, endDateISO, skipSundays, holidayDates);
+  const dates = buildDateList(startDateISO, endDateISO, holidayDates);
 
   // Calcular el ticket inicial considerando la brecha
   let ticket = calculateInitialTicket(
@@ -51,9 +50,7 @@ async function generateExcel({
     lastTicketDate,
     startDateISO,
     Number(spacingVariance),
-    Number(dailyTicketCount),
-    skipSundays,
-    holidayDates
+    Number(dailyTicketCount)
   );
 
   const workbook = new ExcelJS.Workbook();

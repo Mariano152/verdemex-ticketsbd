@@ -62,7 +62,6 @@ function safeLoadConfig() {
         precioPorTon: 0,
       },
       rules: {
-        skipSundays: false,
         decimalsPesoTon: 2,
         kgRounding: 2,
       },

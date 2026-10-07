@@ -23,7 +23,6 @@ export function getDefaultConfig() {
       precioPorTon: 520.33
     },
     rules: {
-      skipSundays: true,
       decimalsPesoTon: 3,
       kgRounding: "round"
     },
